@@ -6,8 +6,9 @@ These are the I/O-bound capabilities the mesh composes in parallel:
                                     and their citations via Cypher.
   * :func:`research_clause`       — Perplexity (sonar-reasoning): live, web-
                                     grounded legal research with citations.
-  * :func:`assess_local_risk`     — NVIDIA NIM high-security agent (local mock)
-                                    for processing sensitive clauses on-prem.
+  * :func:`assess_local_risk`     — NVIDIA NIM / Nemotron high-security agent
+                                    (hosted API or self-hosted on-prem container)
+                                    with an offline heuristic fallback.
 
 Every function is fully async and defensive: a failure in any single tool
 degrades gracefully (returns a structured ``error`` payload) so the mesh can
@@ -16,7 +17,9 @@ still produce a best-effort risk assessment.
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 from typing import Any, Dict, List
 
 import httpx
@@ -25,6 +28,7 @@ from config import (
     get_neo4j_driver,
     get_settings,
     neo4j_is_live,
+    nim_is_live,
     perplexity_is_live,
 )
 
@@ -319,50 +323,91 @@ def _mock_nim_assessment(clause_text: str) -> Dict[str, Any]:
     }
 
 
-async def assess_local_risk(clause_text: str) -> Dict[str, Any]:
-    """Process a sensitive clause through the NIM high-security agent.
+_NIM_SYSTEM = (
+    "You are a high-security legal risk classifier for contract clauses. "
+    "Assess the clause for risk to the party engaging you. Respond with a SINGLE "
+    "JSON object and nothing else, matching this schema:\n"
+    '{"severity": "LOW" | "MEDIUM" | "HIGH", '
+    '"flagged_terms": string[], '
+    '"rationale": string}\n'
+    "flagged_terms must quote the exact risky phrases from the clause. Keep "
+    "rationale to one or two sentences."
+)
 
-    When ``NIM_MOCK`` is true (default) this runs a local deterministic mock —
-    representing on-prem processing where sensitive data never leaves the
-    secured boundary. Otherwise it calls a live NIM container.
+
+def _parse_nim_json(content: str) -> Dict[str, Any] | None:
+    """Best-effort extraction of the strict-JSON verdict from the model output."""
+    if not content:
+        return None
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", content, re.DOTALL)
+        if not match:
+            return None
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
+            return None
+
+
+async def assess_local_risk(clause_text: str) -> Dict[str, Any]:
+    """Process a sensitive clause through the NVIDIA NIM / Nemotron risk agent.
+
+    Without a configured ``NVIDIA_API_KEY`` (or with ``NIM_MOCK=true``) this runs
+    a deterministic local heuristic so the pipeline is fully runnable offline.
+    Otherwise it calls the OpenAI-compatible NIM endpoint (NVIDIA hosted API by
+    default, or a self-hosted container via ``NIM_BASE_URL``) and parses a
+    structured severity + flagged-terms verdict.
     """
     settings = get_settings()
 
-    if settings.nim_mock:
+    if not nim_is_live():
         logger.info("NIM running in local mock mode")
         return _mock_nim_assessment(clause_text)
 
+    base = settings.nim_base_url.rstrip("/")
+    on_prem = ("localhost" in base) or ("127.0.0.1" in base)
     payload = {
-        "model": "nim-legal-risk",
+        "model": settings.nim_model,
         "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "You are a high-security on-prem legal risk classifier. "
-                    "Return severity (LOW/MEDIUM/HIGH) and flagged risk terms."
-                ),
-            },
+            {"role": "system", "content": _NIM_SYSTEM},
             {"role": "user", "content": clause_text},
         ],
+        "temperature": 0.2,
+        "max_tokens": 512,
     }
+    headers = {"Authorization": f"Bearer {settings.nvidia_api_key}"}
 
     try:
         async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
             resp = await client.post(
-                f"{settings.nim_base_url}/v1/chat/completions", json=payload
+                f"{base}/chat/completions", json=payload, headers=headers
             )
             resp.raise_for_status()
             data = resp.json()
 
-        content = (
-            data.get("choices", [{}])[0].get("message", {}).get("content", "")
-        )
-        logger.info("NIM live assessment received")
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        parsed = _parse_nim_json(content)
+        if not parsed:
+            raise ValueError("NIM returned no parseable JSON verdict")
+
+        severity = str(parsed.get("severity", "MEDIUM")).upper()
+        if severity not in ("LOW", "MEDIUM", "HIGH"):
+            severity = "MEDIUM"
+        flagged = [str(t) for t in (parsed.get("flagged_terms") or []) if t]
+
+        logger.info("NIM/Nemotron live assessment received (severity=%s)", severity)
         return {
             "source": "nim",
             "mode": "live",
-            "assessment": content,
-            "processed_locally": True,
+            "model": settings.nim_model,
+            "severity": severity,
+            "flagged_terms": flagged,
+            "rationale": str(
+                parsed.get("rationale", "NVIDIA Nemotron risk assessment.")
+            ),
+            "processed_locally": on_prem,
         }
 
     except Exception as exc:  # noqa: BLE001 — defensive: degrade gracefully

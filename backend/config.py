@@ -62,9 +62,13 @@ class Settings(BaseSettings):
     perplexity_model: str = "sonar-reasoning"
     perplexity_base_url: str = "https://api.perplexity.ai"
 
-    # --- NVIDIA NIM (High-Security Risk Agent) ---
-    nim_base_url: str = "http://localhost:8000"
-    nim_mock: bool = True
+    # --- NVIDIA NIM / Nemotron (High-Security Risk Agent) ---
+    # Defaults target NVIDIA's hosted, OpenAI-compatible API. Point NIM_BASE_URL
+    # at a self-hosted NIM container for true on-prem processing.
+    nim_base_url: str = "https://integrate.api.nvidia.com/v1"
+    nvidia_api_key: str = ""
+    nim_model: str = "nvidia/llama-3.1-nemotron-70b-instruct"
+    nim_mock: bool = False
 
     # --- CORS ---
     # Lovable's dev server defaults to :8080; Vite's default is :5173. Both
@@ -144,8 +148,9 @@ def perplexity_is_live() -> bool:
 
 
 def nim_is_live() -> bool:
-    """True when the NIM agent is wired to a real container (not the mock)."""
-    return not get_settings().nim_mock
+    """True when the NIM/Nemotron agent has a usable API key and isn't forced to mock."""
+    s = get_settings()
+    return _looks_configured(s.nvidia_api_key) and not s.nim_mock
 
 
 def firestore_is_live() -> bool:
