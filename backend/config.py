@@ -98,9 +98,33 @@ def _looks_configured(value: str) -> bool:
     return bool(v) and not any(v.startswith(p) for p in _PLACEHOLDER_TOKENS if p)
 
 
+@lru_cache(maxsize=1)
+def _adc_available() -> bool:
+    """True when Application Default Credentials resolve.
+
+    Covers ``gcloud auth application-default login`` (local),
+    ``GOOGLE_APPLICATION_CREDENTIALS``, and the Cloud Run metadata server.
+    Cached for the process lifetime — run the ADC login then restart the
+    backend to pick up newly-granted credentials.
+    """
+    try:
+        import google.auth
+
+        creds, _ = google.auth.default()
+        return creds is not None
+    except Exception:  # noqa: BLE001 — no credentials available
+        logger.info("No Application Default Credentials found; GCP runs in demo mode")
+        return False
+
+
 def vertex_is_live() -> bool:
-    """True when Vertex AI has a real (non-placeholder) project configured."""
-    return _looks_configured(get_settings().gcp_project_id)
+    """True when Vertex AI has a real project *and* usable credentials.
+
+    Requiring credentials (not just a project id) keeps the UI fast and honest:
+    without ADC the mesh stays in deterministic demo mode instead of hanging on
+    a doomed live call.
+    """
+    return _looks_configured(get_settings().gcp_project_id) and _adc_available()
 
 
 def neo4j_is_live() -> bool:

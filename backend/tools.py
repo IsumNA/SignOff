@@ -21,7 +21,12 @@ from typing import Any, Dict, List
 
 import httpx
 
-from config import get_neo4j_driver, get_settings, neo4j_is_live
+from config import (
+    get_neo4j_driver,
+    get_settings,
+    neo4j_is_live,
+    perplexity_is_live,
+)
 
 logger = logging.getLogger("signoff.tools")
 
@@ -110,7 +115,7 @@ async def research_clause(clause_text: str, jurisdiction: str = "EU") -> Dict[st
     """
     settings = get_settings()
 
-    if not settings.perplexity_api_key:
+    if not perplexity_is_live():
         logger.info("Perplexity not configured; skipping live research (demo mode)")
         return {
             "source": "perplexity",

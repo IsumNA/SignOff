@@ -33,7 +33,7 @@ from config import (
     get_settings,
     integration_status,
 )
-from matters import list_matters
+from matters import create_matter, get_matter, list_matters, list_tasks
 from mesh import run_mesh
 
 logging.basicConfig(
@@ -126,6 +126,7 @@ class Matter(BaseModel):
     compliance_envelope: int
     blockers: MatterBlocker
     status: str
+    stage: str
     action: str
 
 
@@ -139,6 +140,40 @@ class LedgerSummary(BaseModel):
 class MattersResponse(BaseModel):
     matters: List[Matter]
     summary: LedgerSummary
+
+
+class MatterCreate(BaseModel):
+    """Plan-stage payload: define a matter, its risk envelope, and the agents."""
+
+    name: str = Field(..., min_length=1)
+    asset_class: str = "M&A"
+    deal_size: str = "—"
+    jurisdiction: str = "English law"
+    agents_deployed: List[str] = Field(default_factory=list)
+    scope: List[str] = Field(default_factory=list)
+    redlines: List[str] = Field(default_factory=list)
+    envelope_target: int = 100
+    escalation_tier: int = 3
+
+
+class Task(BaseModel):
+    id: str
+    ref: str
+    title: str
+    column: str
+    agent: str
+    tier: int
+    flagged: bool
+    note: str = ""
+
+
+class TasksResponse(BaseModel):
+    matter_id: str
+    matter_name: str
+    stage: str
+    columns: List[str]
+    tasks: List[Task]
+    counts: Dict[str, int]
 
 
 class SignOffRequest(BaseModel):
@@ -241,6 +276,22 @@ async def health() -> HealthResponse:
 async def matters() -> MattersResponse:
     """Multi-matter risk ledger — the partner's portfolio command center."""
     return MattersResponse(**list_matters())
+
+
+@app.post("/api/matters", response_model=Matter, status_code=201)
+async def new_matter(payload: MatterCreate) -> Matter:
+    """Plan stage — register a supervised matter, define its envelope, deploy agents."""
+    created = create_matter(payload.model_dump())
+    await _write_audit_log({"type": "matter_planned", **created})
+    return Matter(**{k: created[k] for k in Matter.model_fields})
+
+
+@app.get("/api/matters/{matter_id}/tasks", response_model=TasksResponse)
+async def matter_tasks(matter_id: str) -> TasksResponse:
+    """Coordinate stage — the workstream board for one matter."""
+    if get_matter(matter_id) is None:
+        raise HTTPException(status_code=404, detail=f"Matter '{matter_id}' not found")
+    return TasksResponse(**list_tasks(matter_id))
 
 
 @app.post("/api/chat", response_model=ChatResponse)

@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import {
   getHealth,
+  getMatters,
   newSessionId,
   sendChat,
   signOff,
@@ -49,9 +50,11 @@ import {
   type Classification,
   type EvidenceItem,
   type HealthResponse,
+  type Matter,
   type Posture,
   type SignOffRecord,
 } from "@/lib/api";
+import { LifecycleStepper } from "@/components/Lifecycle";
 
 export const Route = createFileRoute("/matter/$matterId")({
   head: () => ({
@@ -67,7 +70,7 @@ export const Route = createFileRoute("/matter/$matterId")({
 // Demo contract
 // ---------------------------------------------------------------------------
 
-const DEAL = {
+const DEAL_DEFAULTS = {
   name: "Project Titan",
   client: "Helios Energy Corp.",
   counterparty: "Northwind Holdings",
@@ -76,11 +79,12 @@ const DEAL = {
   law: "English law",
 };
 
-const DEALS = [
-  { id: "titan", name: "Project Titan", client: "Helios Energy Corp.", value: "$2.4B", status: "In review", active: true },
-  { id: "vega", name: "Project Vega", client: "Aurora Pharma", value: "$840M", status: "Awaiting markup", active: false },
-  { id: "atlas", name: "Project Atlas", client: "Meridian Logistics", value: "$1.1B", status: "Signed", active: false },
-];
+const MATTER_STATUS_LABEL: Record<string, string> = {
+  review: "In review",
+  warning: "Warning",
+  escalate: "Escalation",
+  passed: "Cleared",
+};
 
 type Severity = "clean" | "review" | "policy";
 type Risk = { phrase: string; kind: "high" | "policy" };
@@ -601,6 +605,8 @@ type Analysis = {
 type AuditEntry = { rec: SignOffRecord; ref: string; title: string };
 
 function SignOff() {
+  const { matterId } = Route.useParams();
+  const [matters, setMatters] = useState<Matter[]>([]);
   const [selectedId, setSelectedId] = useState<string>("c73");
   const [analyses, setAnalyses] = useState<Record<string, Analysis>>({});
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -620,12 +626,21 @@ function SignOff() {
   const [actions, setActions] = useState<Record<PbTier, string>>(DEFAULT_ACTIONS);
   const sessionRef = useRef<string>("");
 
+  const currentMatter = matters.find((m) => m.id === matterId);
+  const deal = {
+    ...DEAL_DEFAULTS,
+    name: currentMatter?.name ?? DEAL_DEFAULTS.name,
+    value: currentMatter?.deal_size ?? DEAL_DEFAULTS.value,
+    client: currentMatter?.asset_class ?? DEAL_DEFAULTS.client,
+  };
+
   const selected = CLAUSES.find((c) => c.id === selectedId) ?? null;
   const analysis = selected ? analyses[selected.id] : undefined;
   const loading = loadingId === selectedId;
 
   useEffect(() => {
     getHealth().then(setHealth).catch(() => setHealth(null));
+    getMatters().then((r) => setMatters(r.matters)).catch(() => setMatters([]));
     const mac = CLAUSES.find((c) => c.id === "c73");
     if (mac) void runAnalysis(mac, mac.text);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -725,6 +740,15 @@ function SignOff() {
             <ArrowLeft className="h-3.5 w-3.5" />
             <span className="text-[11px] font-medium">Ledger</span>
           </Link>
+          <Link
+            to="/coordinate/$matterId"
+            params={{ matterId }}
+            title="Back to coordination board"
+            className="hidden items-center gap-1 rounded-md px-1.5 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:flex"
+          >
+            <Network className="h-3.5 w-3.5" />
+            <span className="text-[11px] font-medium">Coordinate</span>
+          </Link>
           <span className="h-4 w-px bg-border" />
           <Link to="/" className="flex items-center gap-2.5">
             <span className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-background">
@@ -733,17 +757,20 @@ function SignOff() {
             <span className="text-sm font-bold tracking-tight">SignOff</span>
           </Link>
           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="truncate text-sm font-medium">{DEAL.name}</span>
+          <span className="truncate text-sm font-medium">{deal.name}</span>
           <span className="hidden md:inline rounded-md border border-border bg-surface-elevated px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
-            {DEAL.draft} · {DEAL.value}
+            {deal.draft} · {deal.value}
           </span>
         </div>
         <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+          <span className="hidden xl:block">
+            <LifecycleStepper current={currentMatter?.stage ?? "review"} matterId={matterId} compact />
+          </span>
           <span className="flex items-center gap-1.5">
             <Network className="h-3 w-3" />
             {health ? (meshLive ? "mesh online" : "demo mode") : "offline"}
           </span>
-          <span className="hidden lg:inline font-mono">{DEAL.law}</span>
+          <span className="hidden lg:inline font-mono">{deal.law}</span>
         </div>
       </header>
 
@@ -779,24 +806,29 @@ function SignOff() {
             </button>
           </div>
           <div className="space-y-0.5 px-2">
-            {DEALS.map((d) => (
-              <button
-                key={d.id}
-                className={`flex w-full items-start gap-2 rounded-lg px-2 py-2 text-left transition-colors ${
-                  d.active ? "bg-card" : "hover:bg-card/50"
-                }`}
-              >
-                <Briefcase className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${d.active ? "text-foreground" : "text-muted-foreground"}`} />
-                <span className="min-w-0 flex-1">
-                  <span className={`block truncate text-[12px] font-semibold ${d.active ? "text-foreground" : "text-muted-foreground"}`}>{d.name}</span>
-                  <span className="block truncate text-[10px] text-muted-foreground">{d.client} · {d.value}</span>
-                  <span className="mt-0.5 inline-flex items-center gap-1 text-[9px] uppercase tracking-wider text-muted-foreground">
-                    <span className={`h-1.5 w-1.5 rounded-full ${d.active ? "bg-[color:var(--color-warning)]" : "bg-muted-foreground/40"}`} />
-                    {d.status}
+            {matters.map((m) => {
+              const active = m.id === matterId;
+              return (
+                <Link
+                  key={m.id}
+                  to="/matter/$matterId"
+                  params={{ matterId: m.id }}
+                  className={`flex w-full items-start gap-2 rounded-lg px-2 py-2 text-left transition-colors ${
+                    active ? "bg-card" : "hover:bg-card/50"
+                  }`}
+                >
+                  <Briefcase className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${active ? "text-foreground" : "text-muted-foreground"}`} />
+                  <span className="min-w-0 flex-1">
+                    <span className={`block truncate text-[12px] font-semibold ${active ? "text-foreground" : "text-muted-foreground"}`}>{m.name}</span>
+                    <span className="block truncate text-[10px] text-muted-foreground">{m.asset_class} · {m.deal_size}</span>
+                    <span className="mt-0.5 inline-flex items-center gap-1 text-[9px] uppercase tracking-wider text-muted-foreground">
+                      <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-[color:var(--color-warning)]" : "bg-muted-foreground/40"}`} />
+                      {MATTER_STATUS_LABEL[m.status] ?? m.status}
+                    </span>
                   </span>
-                </span>
-              </button>
-            ))}
+                </Link>
+              );
+            })}
           </div>
 
           <div className="px-3 pt-6 pb-2">
@@ -842,7 +874,7 @@ function SignOff() {
           <div className="flex items-stretch border-b border-border bg-surface text-[12px]">
             <div className="flex items-center gap-2 border-r border-border bg-background px-3 py-1.5 text-foreground">
               <FileText className="h-3.5 w-3.5 text-[color:var(--color-info)]" />
-              <span>SPA_{DEAL.name.replace(/\s+/g, "_")}.md</span>
+              <span>SPA_{deal.name.replace(/\s+/g, "_")}.md</span>
               <span className="ml-1 h-1.5 w-1.5 rounded-full bg-muted-foreground/70" title="Unsaved changes" />
             </div>
             <div className="flex items-center gap-2 border-r border-border px-3 py-1.5 text-muted-foreground">
@@ -850,7 +882,7 @@ function SignOff() {
               <span>disclosure_schedules.pdf</span>
             </div>
             <div className="ml-auto flex items-center px-3 font-mono text-[10px] text-muted-foreground">
-              {selected ? `${selected.ref} · ` : ""}{DEAL.draft}
+              {selected ? `${selected.ref} · ` : ""}{deal.draft}
             </div>
           </div>
           <main className="min-h-0 flex-1 overflow-y-auto scrollbar-thin bg-background">
@@ -858,7 +890,7 @@ function SignOff() {
             <div className="mb-6 border-b border-border pb-4">
               <h1 className="text-lg font-bold tracking-tight">Share Purchase Agreement</h1>
               <p className="mt-1 text-[12px] text-muted-foreground">
-                {DEAL.client} ⟶ {DEAL.counterparty} · Buy-side · {DEAL.draft}
+                {deal.client} ⟶ {deal.counterparty} · Buy-side · {deal.draft}
               </p>
             </div>
 
@@ -1265,7 +1297,7 @@ function SignOff() {
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
             <GitBranch className="h-3 w-3" />
-            {DEAL.name.toLowerCase().replace(/\s+/g, "-")}
+            {deal.name.toLowerCase().replace(/\s+/g, "-")}
           </span>
           <span className="flex items-center gap-1">
             <span
@@ -1293,7 +1325,7 @@ function SignOff() {
             </button>
           )}
           {selected && <span>{selected.ref}</span>}
-          <span>{DEAL.law}</span>
+          <span>{deal.law}</span>
           <span>UTF-8</span>
         </div>
       </footer>

@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
   AlertOctagon,
@@ -12,6 +12,7 @@ import {
   Layers,
   Loader2,
   Network,
+  Plus,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -21,6 +22,7 @@ import {
   type HealthResponse,
   type LedgerSummary,
   type Matter,
+  type MatterStage,
   type MatterStatus,
 } from "@/lib/api";
 
@@ -74,6 +76,39 @@ function agentColor(name: string): string {
   const n = name.toLowerCase();
   for (const a of AGENT_DOT) if (a.match.some((m) => n.includes(m))) return a.color;
   return "var(--color-muted-foreground)";
+}
+
+const STAGE_ORDER: MatterStage[] = ["plan", "coordinate", "review", "signoff"];
+const STAGE_LABEL: Record<MatterStage, string> = {
+  plan: "Plan",
+  coordinate: "Coordinate",
+  review: "Review",
+  signoff: "Sign Off",
+};
+
+function StageDots({ stage }: { stage: MatterStage }) {
+  const idx = STAGE_ORDER.indexOf(stage);
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
+        {STAGE_ORDER.map((s, i) => (
+          <span
+            key={s}
+            className="h-1.5 w-1.5 rounded-full"
+            style={{
+              background:
+                i < idx
+                  ? "var(--color-success)"
+                  : i === idx
+                    ? "var(--color-foreground)"
+                    : "var(--color-border-strong)",
+            }}
+          />
+        ))}
+      </div>
+      <span className="text-[11px] font-medium text-foreground">{STAGE_LABEL[stage]}</span>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +234,20 @@ function Ledger() {
     : false;
 
   function openMatter(m: Matter) {
+    // Route to the matter's current lifecycle stage.
+    if (m.stage === "plan" || m.stage === "coordinate") {
+      navigate({ to: "/coordinate/$matterId", params: { matterId: m.id } });
+    } else {
+      navigate({ to: "/matter/$matterId", params: { matterId: m.id } });
+    }
+  }
+
+  function openReview(m: Matter) {
     navigate({ to: "/matter/$matterId", params: { matterId: m.id } });
+  }
+
+  function openCoordinate(m: Matter) {
+    navigate({ to: "/coordinate/$matterId", params: { matterId: m.id } });
   }
 
   return (
@@ -217,6 +265,12 @@ function Ledger() {
           </span>
         </div>
         <div className="flex items-center gap-4">
+          <Link
+            to="/plan"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-1.5 text-[12px] font-semibold text-background transition hover:opacity-90"
+          >
+            <Plus className="h-3.5 w-3.5" /> New Matter
+          </Link>
           <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <span
               className="h-1.5 w-1.5 rounded-full"
@@ -279,10 +333,11 @@ function Ledger() {
 
           {/* Ledger table */}
           <div className="overflow-hidden rounded-xl border border-border bg-card/30">
-            <div className="grid grid-cols-[1.6fr_1.1fr_1.7fr_1.1fr_1.5fr_auto] items-center gap-4 border-b border-border bg-surface/60 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="grid grid-cols-[1.5fr_0.9fr_1.4fr_1.2fr_0.9fr_1.2fr_auto] items-center gap-4 border-b border-border bg-surface/60 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               <span>Active Matter</span>
               <span>Asset / Size</span>
               <span>Agents Deployed</span>
+              <span>Lifecycle Stage</span>
               <span>Envelope</span>
               <span>Blockers Pending</span>
               <span className="text-right">Action</span>
@@ -305,7 +360,7 @@ function Ledger() {
                   <div
                     key={m.id}
                     onClick={() => openMatter(m)}
-                    className="group grid cursor-pointer grid-cols-[1.6fr_1.1fr_1.7fr_1.1fr_1.5fr_auto] items-center gap-4 border-b border-border/60 px-5 py-4 transition-colors last:border-0 hover:bg-accent/40"
+                    className="group grid cursor-pointer grid-cols-[1.5fr_0.9fr_1.4fr_1.2fr_0.9fr_1.2fr_auto] items-center gap-4 border-b border-border/60 px-5 py-4 transition-colors last:border-0 hover:bg-accent/40"
                   >
                     {/* Matter */}
                     <div className="flex items-center gap-3 min-w-0">
@@ -340,6 +395,9 @@ function Ledger() {
                     {/* Agents */}
                     <AgentChips agents={m.agents_deployed} />
 
+                    {/* Lifecycle stage */}
+                    <StageDots stage={m.stage} />
+
                     {/* Envelope */}
                     <EnvelopeBar pct={m.compliance_envelope} />
 
@@ -348,18 +406,26 @@ function Ledger() {
                       <BlockerPill blockers={m.blockers} />
                     </div>
 
-                    {/* Action */}
+                    {/* Action — stage-aware */}
                     <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
                       {m.action === "signoff" ? (
                         <button
-                          onClick={() => openMatter(m)}
+                          onClick={() => openReview(m)}
                           className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-1.5 text-[12px] font-semibold text-background transition hover:opacity-90"
                         >
                           <FileSignature className="h-3.5 w-3.5" /> Sign Off Matter
                         </button>
+                      ) : m.stage === "plan" || m.stage === "coordinate" ? (
+                        <button
+                          onClick={() => openCoordinate(m)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-border-strong px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                        >
+                          <Network className="h-3.5 w-3.5" /> Coordinate
+                          <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                        </button>
                       ) : (
                         <button
-                          onClick={() => openMatter(m)}
+                          onClick={() => openReview(m)}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-border-strong px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground"
                         >
                           Review Work

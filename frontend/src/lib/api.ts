@@ -98,6 +98,9 @@ export interface HealthResponse {
 export type MatterStatus = "review" | "warning" | "escalate" | "passed";
 export type MatterAction = "review" | "signoff";
 
+// The supervision lifecycle: plan → coordinate → review → sign off.
+export type MatterStage = "plan" | "coordinate" | "review" | "signoff";
+
 export interface MatterBlocker {
   count: number;
   tier: number;
@@ -113,6 +116,7 @@ export interface Matter {
   compliance_envelope: number;
   blockers: MatterBlocker;
   status: MatterStatus;
+  stage: MatterStage;
   action: MatterAction;
 }
 
@@ -131,6 +135,67 @@ export interface MattersResponse {
 export async function getMatters(): Promise<MattersResponse> {
   const res = await fetch(`${API_BASE}/api/matters`);
   if (!res.ok) throw new Error(`matters ${res.status}`);
+  return res.json();
+}
+
+// ---- (i) Plan stage — create a supervised matter ----
+
+export interface MatterCreate {
+  name: string;
+  asset_class?: string;
+  deal_size?: string;
+  jurisdiction?: string;
+  agents_deployed?: string[];
+  scope?: string[];
+  redlines?: string[];
+  envelope_target?: number;
+  escalation_tier?: number;
+}
+
+export async function createMatter(input: MatterCreate): Promise<Matter> {
+  const res = await fetch(`${API_BASE}/api/matters`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`create matter ${res.status}`);
+  return res.json();
+}
+
+// ---- (ii) Coordinate stage — the workstream board ----
+
+export type TaskColumn =
+  | "queued"
+  | "risk"
+  | "precedent"
+  | "research"
+  | "synthesis"
+  | "counsel"
+  | "signed";
+
+export interface Task {
+  id: string;
+  ref: string;
+  title: string;
+  column: TaskColumn;
+  agent: string;
+  tier: number;
+  flagged: boolean;
+  note: string;
+}
+
+export interface TasksResponse {
+  matter_id: string;
+  matter_name: string;
+  stage: MatterStage;
+  columns: TaskColumn[];
+  tasks: Task[];
+  counts: Record<TaskColumn, number>;
+}
+
+export async function getTasks(matterId: string): Promise<TasksResponse> {
+  const res = await fetch(`${API_BASE}/api/matters/${matterId}/tasks`);
+  if (!res.ok) throw new Error(`tasks ${res.status}`);
   return res.json();
 }
 
