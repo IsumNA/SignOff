@@ -317,6 +317,32 @@ export async function getInsights(): Promise<PortfolioInsights> {
   return res.json();
 }
 
+// ---- Risk-classification benchmark (reproducible accuracy measurement) ----
+
+export interface EvalMetrics {
+  n: number;
+  tier_accuracy: number | null;
+  adjacent_accuracy: number | null;
+  escalation_recall: number | null;
+  escalation_precision: number | null;
+  per_tier: Record<string, { support: number; recall: number | null }>;
+  confusion_matrix: Record<string, Record<string, number>>;
+}
+
+export interface EvalResult {
+  available: boolean;
+  generated_at?: string;
+  mode?: "live" | "demo";
+  dataset_size?: number;
+  metrics?: EvalMetrics;
+}
+
+export async function getEval(): Promise<EvalResult> {
+  const res = await fetch(`${API_BASE}/api/eval`);
+  if (!res.ok) throw new Error(`eval ${res.status}`);
+  return res.json();
+}
+
 export function newSessionId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }

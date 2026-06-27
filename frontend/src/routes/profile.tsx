@@ -5,6 +5,7 @@ import {
   Bell,
   Building2,
   Check,
+  Gauge,
   LogOut,
   Mail,
   Moon,
@@ -13,7 +14,12 @@ import {
   Sun,
   UserRound,
 } from "lucide-react";
-import { getHealth, type HealthResponse } from "@/lib/api";
+import {
+  getEval,
+  getHealth,
+  type EvalResult,
+  type HealthResponse,
+} from "@/lib/api";
 import { getStoredTheme, setTheme, type Theme } from "@/lib/theme";
 import { Brand } from "@/components/Brand";
 import { Scales, Seal, Workstreams } from "@/components/icons";
@@ -139,6 +145,22 @@ function SettingRow({
   );
 }
 
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-surface/40 px-3 py-3 text-center">
+      <div className="font-serif text-[24px] font-medium leading-none tracking-tight tabular-nums">
+        {value}
+      </div>
+      <div className="mt-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+const pct = (v: number | null | undefined): string =>
+  v == null ? "—" : `${Math.round(v * 100)}%`;
+
 function Section({
   Icon,
   title,
@@ -162,6 +184,7 @@ function Section({
 function Profile() {
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [evalResult, setEvalResult] = useState<EvalResult | null>(null);
   const [saved, setSaved] = useState(false);
   const [theme, setThemeState] = useState<Theme>("light");
 
@@ -169,6 +192,7 @@ function Profile() {
     setPrefs(loadPrefs());
     setThemeState(getStoredTheme());
     getHealth().then(setHealth).catch(() => setHealth(null));
+    getEval().then(setEvalResult).catch(() => setEvalResult(null));
   }, []);
 
   function chooseTheme(next: Theme) {
@@ -407,6 +431,44 @@ function Profile() {
                 );
               })}
             </Section>
+
+            {/* Measured model accuracy — reproducible benchmark */}
+            {evalResult && (
+              <Section Icon={Gauge} title="Model accuracy">
+                {evalResult.available && evalResult.metrics ? (
+                  <div className="py-3.5">
+                    <div className="grid grid-cols-3 gap-3">
+                      <Stat
+                        label="Risk-level accuracy"
+                        value={pct(evalResult.metrics.tier_accuracy)}
+                      />
+                      <Stat
+                        label="Critical clauses caught"
+                        value={pct(evalResult.metrics.escalation_recall)}
+                      />
+                      <Stat
+                        label="Within one level"
+                        value={pct(evalResult.metrics.adjacent_accuracy)}
+                      />
+                    </div>
+                    <p className="mt-3 text-[11.5px] leading-snug text-muted-foreground">
+                      Measured on {evalResult.dataset_size} benchmark clauses with
+                      lawyer-assigned risk levels
+                      {evalResult.mode ? ` (${evalResult.mode} models)` : ""}.
+                      “Critical clauses caught” is how often the review correctly
+                      escalated the genuinely high-risk clauses — the number that
+                      matters most for supervision.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="py-3.5 text-[12px] leading-snug text-muted-foreground">
+                    No benchmark recorded yet. Run{" "}
+                    <code className="font-mono text-[11px]">python evaluate.py</code> in
+                    the backend to measure and publish accuracy here.
+                  </div>
+                )}
+              </Section>
+            )}
 
             {/* Security & records */}
             <Section Icon={ShieldCheck} title="Security & records">

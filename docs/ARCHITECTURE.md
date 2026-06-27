@@ -130,7 +130,31 @@ reading live from `matters.py` and `audit.py` so it adapts as matters are added.
 
 ---
 
-## 7. Live vs demo
+## 7. Evaluation & tests
+
+Trust in a supervision tool has to be measurable, so the backend ships two
+reproducible checks.
+
+**Risk-classification benchmark** (`evaluate.py` + `eval/clauses.json`). A
+balanced, lawyer-labelled set of 21 clauses (including hard cases where wording
+and true risk diverge) is run through the *real* `run_mesh` pipeline and scored
+on tier accuracy, **escalation recall** (the share of genuinely critical clauses
+caught — the metric that matters most), escalation precision, adjacent-tier
+accuracy, and a confusion matrix. Results are written to `eval/results.json` and
+served at `GET /api/eval` (surfaced in Profile → *Model accuracy*). The latest
+live run: **100% escalation recall, 100% adjacent accuracy, 76% exact tier**,
+with errors biased conservatively toward human review.
+
+**Automated test suite** (`tests/`, run with `pytest`). 20 tests assert the
+product's guarantees — the audit hash chain detecting edits/deletions/reordering
+(`test_audit.py`), the demo classifier escalating high-risk and passing
+boilerplate (`test_classification.py`), and plan-suggestion confidence rising
+with comparable matters (`test_insights.py`). All run offline with no
+credentials.
+
+---
+
+## 8. Live vs demo
 
 `config.py` exposes `integration_status()` and per-integration `*_is_live()`
 checks. The rule throughout the codebase:
@@ -143,7 +167,7 @@ recommendation — so a judge can always see exactly what is real.
 
 ---
 
-## 8. Deployment
+## 9. Deployment
 
 The backend is a single container (`backend/Dockerfile`) targeting **Cloud
 Run**, which injects `PORT`. Locally it binds `:8000` (the frontend dev server

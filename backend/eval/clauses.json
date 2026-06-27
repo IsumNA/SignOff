@@ -1,0 +1,161 @@
+{
+  "description": "SignOff risk-classification benchmark. Each clause carries a lawyer-assigned gold tier (1 routine / 2 material / 3 escalate). The set is deliberately balanced and includes hard cases where surface wording and true risk diverge, so the score reflects judgement rather than keyword spotting.",
+  "tier_convention": {
+    "1": "Routine — approve",
+    "2": "Material risk — amend",
+    "3": "Escalation required — reject"
+  },
+  "jurisdiction": "English law",
+  "clauses": [
+    {
+      "id": "T3-01",
+      "category": "Indemnity",
+      "gold_tier": 3,
+      "clause": "The Seller shall indemnify the Buyer on an uncapped basis for all Losses arising out of or in connection with this Agreement, with unlimited liability and without any time limitation.",
+      "rationale": "Uncapped, time-unlimited indemnity with unlimited liability is a textbook escalation."
+    },
+    {
+      "id": "T3-02",
+      "category": "IP / Data licence",
+      "gold_tier": 3,
+      "clause": "The Customer grants the Provider a perpetual, irrevocable, worldwide licence to all Customer Data, including personal data, to use for any purpose the Provider sees fit.",
+      "rationale": "Perpetual irrevocable licence over personal data for any purpose is a severe IP and data-protection exposure."
+    },
+    {
+      "id": "T3-03",
+      "category": "Termination / Penalty",
+      "gold_tier": 3,
+      "clause": "The Provider may terminate for convenience on seven days' notice; on any termination the Customer must pay a penalty equal to 100% of all remaining contract fees.",
+      "rationale": "One-sided termination for convenience coupled with a punitive penalty is unenforceable in form and commercially unacceptable."
+    },
+    {
+      "id": "T3-04",
+      "category": "Liability",
+      "gold_tier": 3,
+      "clause": "The Company accepts unlimited liability for any breach and uncapped indemnification for indirect, consequential and special losses of every kind.",
+      "rationale": "Unlimited liability plus uncapped indemnity extending to consequential loss must be escalated."
+    },
+    {
+      "id": "T3-05",
+      "category": "Data protection",
+      "gold_tier": 3,
+      "clause": "The Processor may transfer personal data to any third country and appoint sub-processors without restriction and without notice to or approval from the Controller.",
+      "rationale": "Unrestricted international transfers and sub-processing breach GDPR Chapter V; a real escalation even though the wording is plain.",
+      "hard_case": true
+    },
+    {
+      "id": "T3-06",
+      "category": "IP licence",
+      "gold_tier": 3,
+      "clause": "The licence granted to the Counterparty is perpetual and irrevocable and may not be terminated by the Company even in the event of material breach or insolvency.",
+      "rationale": "An irrevocable licence surviving material breach and insolvency strips the company of its core remedy."
+    },
+    {
+      "id": "T3-07",
+      "category": "Indemnity",
+      "gold_tier": 3,
+      "clause": "The Contractor shall indemnify and hold the Company harmless on an uncapped basis for all claims, including those arising from the Company's own negligence.",
+      "rationale": "Uncapped indemnity covering the indemnified party's own negligence is a classic escalation trigger."
+    },
+    {
+      "id": "T2-01",
+      "category": "Liability cap",
+      "gold_tier": 2,
+      "clause": "The Supplier's total liability under this Agreement shall not exceed the fees paid in the twelve months preceding the claim, and the Supplier shall indemnify the Customer for IP infringement up to that cap.",
+      "rationale": "Capped liability and capped IP indemnity are market-standard but the cap level is worth negotiating — amend."
+    },
+    {
+      "id": "T2-02",
+      "category": "Data protection",
+      "gold_tier": 2,
+      "clause": "The Processor shall process personal data only on the documented instructions of the Controller and shall implement appropriate technical and organisational measures.",
+      "rationale": "Compliant DPA wording, but processing personal data always warrants a material-risk review of the schedule."
+    },
+    {
+      "id": "T2-03",
+      "category": "Termination",
+      "gold_tier": 2,
+      "clause": "Either party may terminate for convenience on ninety days' written notice, with fees payable only for services actually rendered up to termination.",
+      "rationale": "Mutual termination for convenience on reasonable notice is acceptable but materially affects deal certainty."
+    },
+    {
+      "id": "T2-04",
+      "category": "Payment",
+      "gold_tier": 2,
+      "clause": "The Customer shall pay a penalty of two per cent per annum on late payments, capped at the value of the relevant invoice.",
+      "rationale": "A capped late-payment charge is generally acceptable but should be checked for penalty-doctrine risk."
+    },
+    {
+      "id": "T2-05",
+      "category": "IP licence",
+      "gold_tier": 2,
+      "clause": "The Supplier grants a non-exclusive licence for the term of the Agreement; the licence is irrevocable during the paid subscription period only.",
+      "rationale": "Scope-limited irrevocability tied to the paid term is material but commercially normal — amend to confirm scope."
+    },
+    {
+      "id": "T2-06",
+      "category": "Indemnity",
+      "gold_tier": 2,
+      "clause": "Each party shall indemnify the other for third-party claims arising from its own breach, subject to the overall liability cap in clause 10.",
+      "rationale": "Mutual, cap-subject indemnity for own breach is balanced but warrants confirmation of the cap interaction."
+    },
+    {
+      "id": "T2-07",
+      "category": "Deal terms",
+      "gold_tier": 2,
+      "clause": "The Buyer may decline to complete if a material adverse change occurs in the target's business, as determined by the Buyer acting in its sole discretion.",
+      "rationale": "A sole-discretion MAC walk-away right is materially one-sided and must be reviewed, despite plain wording.",
+      "hard_case": true
+    },
+    {
+      "id": "T1-01",
+      "category": "Governing law",
+      "gold_tier": 1,
+      "clause": "This Agreement shall be governed by and construed in accordance with the laws of England and Wales.",
+      "rationale": "Standard governing-law boilerplate."
+    },
+    {
+      "id": "T1-02",
+      "category": "Notices",
+      "gold_tier": 1,
+      "clause": "Any notice under this Agreement shall be in writing and delivered by hand, prepaid post, or email to the addresses set out in Schedule 1.",
+      "rationale": "Routine notices clause."
+    },
+    {
+      "id": "T1-03",
+      "category": "Entire agreement",
+      "gold_tier": 1,
+      "clause": "This Agreement constitutes the entire agreement between the parties and supersedes all prior discussions, representations and understandings.",
+      "rationale": "Standard entire-agreement clause."
+    },
+    {
+      "id": "T1-04",
+      "category": "Severability",
+      "gold_tier": 1,
+      "clause": "If any provision of this Agreement is held to be invalid or unenforceable, the remaining provisions shall continue in full force and effect.",
+      "rationale": "Routine severability clause."
+    },
+    {
+      "id": "T1-05",
+      "category": "Counterparts",
+      "gold_tier": 1,
+      "clause": "This Agreement may be executed in any number of counterparts, each of which when executed shall constitute an original.",
+      "rationale": "Boilerplate counterparts clause."
+    },
+    {
+      "id": "T1-06",
+      "category": "Data protection",
+      "gold_tier": 1,
+      "clause": "Each party shall comply with all applicable data protection laws in respect of any personal data processed in connection with this Agreement.",
+      "rationale": "A bare compliance statement is routine; the surface mention of personal data should not by itself escalate.",
+      "hard_case": true
+    },
+    {
+      "id": "T1-07",
+      "category": "Force majeure",
+      "gold_tier": 1,
+      "clause": "Neither party shall be liable for any failure or delay in performance caused by events beyond its reasonable control, provided it notifies the other party promptly.",
+      "rationale": "Standard mutual force-majeure clause."
+    }
+  ]
+}

@@ -1,0 +1,262 @@
+{
+  "generated_at": "2026-06-27T17:25:30.769714+00:00",
+  "mode": "live",
+  "integrations": {
+    "vertex_ai": "live",
+    "nvidia_nim": "live",
+    "neo4j": "live",
+    "perplexity": "live",
+    "firestore": "live"
+  },
+  "dataset_size": 21,
+  "metrics": {
+    "n": 21,
+    "tier_accuracy": 0.762,
+    "adjacent_accuracy": 1.0,
+    "escalation_recall": 1.0,
+    "escalation_precision": 0.778,
+    "per_tier": {
+      "1": {
+        "support": 7,
+        "recall": 0.857
+      },
+      "2": {
+        "support": 7,
+        "recall": 0.429
+      },
+      "3": {
+        "support": 7,
+        "recall": 1.0
+      }
+    },
+    "confusion_matrix": {
+      "1": {
+        "1": 6,
+        "2": 1,
+        "3": 0
+      },
+      "2": {
+        "1": 2,
+        "2": 3,
+        "3": 2
+      },
+      "3": {
+        "1": 0,
+        "2": 0,
+        "3": 7
+      }
+    }
+  },
+  "results": [
+    {
+      "id": "T3-01",
+      "category": "Indemnity",
+      "gold_tier": 3,
+      "pred_tier": 3,
+      "posture": "reject",
+      "confidence": 0.9,
+      "correct": true,
+      "hard_case": false
+    },
+    {
+      "id": "T3-02",
+      "category": "IP / Data licence",
+      "gold_tier": 3,
+      "pred_tier": 3,
+      "posture": "reject",
+      "confidence": 0.99,
+      "correct": true,
+      "hard_case": false
+    },
+    {
+      "id": "T3-03",
+      "category": "Termination / Penalty",
+      "gold_tier": 3,
+      "pred_tier": 3,
+      "posture": "reject",
+      "confidence": 0.95,
+      "correct": true,
+      "hard_case": false
+    },
+    {
+      "id": "T3-04",
+      "category": "Liability",
+      "gold_tier": 3,
+      "pred_tier": 3,
+      "posture": "reject",
+      "confidence": 0.95,
+      "correct": true,
+      "hard_case": false
+    },
+    {
+      "id": "T3-05",
+      "category": "Data protection",
+      "gold_tier": 3,
+      "pred_tier": 3,
+      "posture": "reject",
+      "confidence": 1.0,
+      "correct": true,
+      "hard_case": true
+    },
+    {
+      "id": "T3-06",
+      "category": "IP licence",
+      "gold_tier": 3,
+      "pred_tier": 3,
+      "posture": "reject",
+      "confidence": 0.95,
+      "correct": true,
+      "hard_case": false
+    },
+    {
+      "id": "T3-07",
+      "category": "Indemnity",
+      "gold_tier": 3,
+      "pred_tier": 3,
+      "posture": "reject",
+      "confidence": 0.9,
+      "correct": true,
+      "hard_case": false
+    },
+    {
+      "id": "T2-01",
+      "category": "Liability cap",
+      "gold_tier": 2,
+      "pred_tier": 2,
+      "posture": "amend",
+      "confidence": 0.75,
+      "correct": true,
+      "hard_case": false
+    },
+    {
+      "id": "T2-02",
+      "category": "Data protection",
+      "gold_tier": 2,
+      "pred_tier": 1,
+      "posture": "approve",
+      "confidence": 0.95,
+      "correct": false,
+      "hard_case": false
+    },
+    {
+      "id": "T2-03",
+      "category": "Termination",
+      "gold_tier": 2,
+      "pred_tier": 1,
+      "posture": "approve",
+      "confidence": 0.75,
+      "correct": false,
+      "hard_case": false
+    },
+    {
+      "id": "T2-04",
+      "category": "Payment",
+      "gold_tier": 2,
+      "pred_tier": 2,
+      "posture": "amend",
+      "confidence": 0.7,
+      "correct": true,
+      "hard_case": false
+    },
+    {
+      "id": "T2-05",
+      "category": "IP licence",
+      "gold_tier": 2,
+      "pred_tier": 2,
+      "posture": "amend",
+      "confidence": 0.9,
+      "correct": true,
+      "hard_case": false
+    },
+    {
+      "id": "T2-06",
+      "category": "Indemnity",
+      "gold_tier": 2,
+      "pred_tier": 3,
+      "posture": "reject",
+      "confidence": 0.6,
+      "correct": false,
+      "hard_case": false
+    },
+    {
+      "id": "T2-07",
+      "category": "Deal terms",
+      "gold_tier": 2,
+      "pred_tier": 3,
+      "posture": "reject",
+      "confidence": 0.95,
+      "correct": false,
+      "hard_case": true
+    },
+    {
+      "id": "T1-01",
+      "category": "Governing law",
+      "gold_tier": 1,
+      "pred_tier": 1,
+      "posture": "approve",
+      "confidence": 0.8,
+      "correct": true,
+      "hard_case": false
+    },
+    {
+      "id": "T1-02",
+      "category": "Notices",
+      "gold_tier": 1,
+      "pred_tier": 1,
+      "posture": "approve",
+      "confidence": 0.8,
+      "correct": true,
+      "hard_case": false
+    },
+    {
+      "id": "T1-03",
+      "category": "Entire agreement",
+      "gold_tier": 1,
+      "pred_tier": 1,
+      "posture": "approve",
+      "confidence": 0.7,
+      "correct": true,
+      "hard_case": false
+    },
+    {
+      "id": "T1-04",
+      "category": "Severability",
+      "gold_tier": 1,
+      "pred_tier": 1,
+      "posture": "approve",
+      "confidence": 0.9,
+      "correct": true,
+      "hard_case": false
+    },
+    {
+      "id": "T1-05",
+      "category": "Counterparts",
+      "gold_tier": 1,
+      "pred_tier": 1,
+      "posture": "approve",
+      "confidence": 0.9,
+      "correct": true,
+      "hard_case": false
+    },
+    {
+      "id": "T1-06",
+      "category": "Data protection",
+      "gold_tier": 1,
+      "pred_tier": 1,
+      "posture": "approve",
+      "confidence": 0.9,
+      "correct": true,
+      "hard_case": true
+    },
+    {
+      "id": "T1-07",
+      "category": "Force majeure",
+      "gold_tier": 1,
+      "pred_tier": 2,
+      "posture": "amend",
+      "confidence": 0.8,
+      "correct": false,
+      "hard_case": false
+    }
+  ]
+}

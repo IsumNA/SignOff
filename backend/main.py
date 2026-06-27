@@ -16,6 +16,7 @@ Endpoints (kept in sync with frontend/src/lib/api.ts):
   Learning
     GET  /api/insights                — cross-matter patterns to scrutinise
     GET  /api/insights/plan           — proactive plan suggestion (learned)
+    GET  /api/eval                    — latest risk-classification benchmark
   Review & sign-off
     POST /api/chat                    — (3) run the review on a clause/question
     GET  /api/trace/{id}/stream       — live SSE stream of execution traces
@@ -36,6 +37,7 @@ import logging
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Request, status
@@ -279,6 +281,16 @@ class InsightsResponse(BaseModel):
     benchmarks: List[Dict[str, Any]]
 
 
+class EvalResponse(BaseModel):
+    """Latest risk-classification benchmark (produced by ``evaluate.py``)."""
+
+    available: bool
+    generated_at: Optional[str] = None
+    mode: Optional[str] = None  # "live" | "demo"
+    dataset_size: Optional[int] = None
+    metrics: Optional[Dict[str, Any]] = None
+
+
 class AnalyzeClauseRequest(BaseModel):
     clause_text: str = Field(..., min_length=1)
     jurisdiction: str = "EU"
@@ -392,6 +404,7 @@ async def root() -> Dict[str, Any]:
             "/api/matters",
             "/api/insights",
             "/api/insights/plan",
+            "/api/eval",
             "/api/chat",
             "/api/trace/{session_id}/stream",
             "/api/signoff",
@@ -458,6 +471,33 @@ async def new_matter(payload: MatterCreate) -> Matter:
 async def get_insights() -> InsightsResponse:
     """Cross-matter patterns a supervising partner should scrutinise."""
     return InsightsResponse(**portfolio.portfolio_insights())
+
+
+_EVAL_RESULTS = Path(__file__).resolve().parent / "eval" / "results.json"
+
+
+@app.get("/api/eval", response_model=EvalResponse)
+async def get_eval() -> EvalResponse:
+    """Serve the latest reproducible risk-classification benchmark.
+
+    Generated offline by ``python evaluate.py`` over a labelled clause set, so
+    the UI can show measured accuracy rather than asserting it. Returns
+    ``available=false`` until the benchmark has been run at least once.
+    """
+    if not _EVAL_RESULTS.exists():
+        return EvalResponse(available=False)
+    try:
+        data = json.loads(_EVAL_RESULTS.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        logger.exception("Failed to read benchmark results")
+        return EvalResponse(available=False)
+    return EvalResponse(
+        available=True,
+        generated_at=data.get("generated_at"),
+        mode=data.get("mode"),
+        dataset_size=data.get("dataset_size"),
+        metrics=data.get("metrics"),
+    )
 
 
 @app.get("/api/insights/plan", response_model=PlanSuggestion)

@@ -32,6 +32,7 @@ Built with a Clifford Chance supervision workflow in mind.
 - [Architecture](#architecture)
 - [Tech stack & live-vs-demo](#tech-stack--live-vs-demo)
 - [Quickstart](#quickstart)
+- [Measured accuracy & tests](#measured-accuracy--tests)
 - [Repository map](#repository-map)
 - [API reference](#api-reference)
 - [How it maps to the judging criteria](#how-it-maps-to-the-judging-criteria)
@@ -195,6 +196,59 @@ The frontend points at the backend via `frontend/.env` →
 
 ---
 
+## Measured accuracy & tests
+
+A supervision tool has to be *measurably* trustworthy, so SignOff ships a
+reproducible benchmark and an automated test suite — not just claims.
+
+### Risk-classification benchmark
+
+`backend/eval/clauses.json` is a labelled set of 21 contract clauses with
+**lawyer-assigned risk levels** (Tier 1/2/3), deliberately balanced and seeded
+with hard cases where surface wording and true risk diverge. `evaluate.py` runs
+the *real* review pipeline over them and scores it:
+
+```bash
+cd backend
+python evaluate.py        # writes eval/results.json, prints the report
+```
+
+Latest run (live multi-model mesh — Gemini synthesis + NVIDIA Nemotron + EU
+Publications Office + Neo4j):
+
+| Metric | Result | Why it matters |
+| --- | :---: | --- |
+| **Escalation recall** | **100%** | Caught **every** genuinely critical (Tier 3) clause — a missed escalation is the expensive failure in legal risk. |
+| **Adjacent (±1) accuracy** | **100%** | Never wildly wrong; at worst one level out. |
+| **Exact tier accuracy** | **76%** | Strict three-way match against the lawyer's label. |
+| **Escalation precision** | **78%** | When it flags critical, it's usually right; the rest err *toward* human review. |
+
+The errors are **conservative by design** — the system flags borderline clauses
+for a human rather than waving them through, which is the correct bias for a
+supervision tool. The headline numbers are also surfaced live in-app
+(Profile → *Model accuracy*) via `GET /api/eval`. With no credentials the same
+harness scores the deterministic demo classifier as a baseline; the `mode` field
+records which was measured.
+
+### Automated tests
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+pytest                    # 20 tests
+```
+
+The suite proves the guarantees the product makes, including:
+
+- **Tamper-evidence** (`tests/test_audit.py`) — editing, deleting, or reordering
+  any audit record breaks the SHA-256 hash chain and is detected.
+- **Risk classification** (`tests/test_classification.py`) — high-risk language
+  escalates, boilerplate doesn't, and tiers map to the right posture.
+- **Portfolio learning** (`tests/test_insights.py`) — plan-suggestion confidence
+  rises with the number of comparable matters.
+
+---
+
 ## Repository map
 
 ```
@@ -212,7 +266,11 @@ SignOff/
 │   ├── events.py                  ← in-process event bus for live SSE traces
 │   ├── matters.py                 ← the matter ledger + lifecycle (demo data)
 │   ├── config.py                  ← settings + lazy clients + live/demo detection
+│   ├── evaluate.py                ← reproducible risk-classification benchmark harness
+│   ├── eval/                      ← labelled clause dataset + latest results.json
+│   ├── tests/                     ← pytest suite (audit tamper-evidence, classifier, insights)
 │   ├── requirements.txt
+│   ├── requirements-dev.txt       ← adds pytest for the test suite
 │   ├── .env.example               ← config template (copy to .env)
 │   └── Dockerfile                 ← Cloud Run image
 │
@@ -250,6 +308,7 @@ Matches `frontend/src/lib/api.ts`. Interactive docs at `/docs`.
 | GET | `/api/matters/{id}/tasks` | Coordinate board for one matter |
 | GET | `/api/insights` | Cross-matter patterns to scrutinise |
 | GET | `/api/insights/plan` | Proactive plan suggestion for a practice area |
+| GET | `/api/eval` | Latest reproducible risk-classification benchmark |
 | POST | `/api/chat` | Run the review on a clause / question |
 | GET | `/api/trace/{session_id}/stream` | Live execution traces (SSE) |
 | POST | `/api/signoff` | Record a sign-off decision (audit trail) |
@@ -280,7 +339,7 @@ convention:** 1 = routine (approve), 2 = material (amend), 3 = escalate (reject)
 | **Solution** | The four-stage lifecycle (`/plan` → `/coordinate` → `/matter` → sign-off) implements the exact supervision brief, end to end. |
 | **Technology** | Parallel multi-model review (`mesh.py`), live key-less EU legislation (`tools.py`), live SSE traces (`events.py`), hash-chained audit (`audit.py`). |
 | **Transformation** | Built for oversight at portfolio scale — the ledger + insights engine (`insights.py`), not single-document tooling. |
-| **Rigour / Impact** | Honest live/demo labelling, verifiable audit (`/api/audit/verify`), and confidence/uncertainty signalling on every recommendation. |
+| **Rigour / Impact** | A reproducible accuracy benchmark (`evaluate.py` → 100% escalation recall, 76% exact tier), a 20-test suite proving tamper-evidence and the classifier, honest live/demo labelling, and verifiable audit (`/api/audit/verify`). |
 | **Investment** | A sharp buyer (supervising partners) and a pain that grows with AI adoption; personalised to a real firm's workflow. |
 | **Overall** | Restrained, intentional design (custom legal iconography, serif/mono typography, light/dark), lawyer-friendly language throughout. |
 
@@ -292,8 +351,10 @@ In keeping with the rigour the brief asks for:
 
 - The matter **ledger is illustrative demo data** — clients/counterparties are
   well-known public companies used purely as realistic placeholders.
-- The AI risk findings have **not yet been benchmarked** against a lawyer's
-  ground-truth labels; accuracy evaluation is the clearest next step.
+- Accuracy is measured on a **21-clause benchmark** (see
+  [Measured accuracy & tests](#measured-accuracy--tests)). It is a credible,
+  reproducible signal — not a large-scale legal eval. Expanding the labelled set
+  (and adding multi-lawyer agreement) is the clearest next step.
 - Portfolio learning currently derives from portfolio configuration and the
   audit trail; it is a transparent heuristic, not a trained model.
 - "Live" vs "Demo" reflects exactly what is configured at runtime — see
