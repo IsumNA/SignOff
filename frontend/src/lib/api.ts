@@ -81,6 +81,9 @@ export async function signOff(input: {
   matter_id?: string;
   clause_ref?: string;
   clause_title?: string;
+  recommended_posture?: Posture;
+  override?: boolean;
+  confidence?: number;
 }): Promise<SignOffRecord> {
   const res = await fetch(`${API_BASE}/api/signoff`, {
     method: "POST",

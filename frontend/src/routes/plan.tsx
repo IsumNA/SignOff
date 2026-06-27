@@ -49,7 +49,7 @@ const SCOPE_OPTIONS = [
 ];
 const AGENT_OPTIONS: { name: string; role: string }[] = [
   { name: "Local NIM", role: "On-prem high-security risk" },
-  { name: "Gemini 2.0 Flash", role: "Synthesis & decisioning" },
+  { name: "Gemini 2.5 Flash", role: "Synthesis & decisioning" },
   { name: "Perplexity", role: "Web-grounded research" },
   { name: "Claude 3.5 Sonnet", role: "Precedent drafting" },
 ];
@@ -118,7 +118,7 @@ function PlanMatter() {
     "Warranties & Indemnities",
     "Merger Control & FDI",
   ]);
-  const [agents, setAgents] = useState<string[]>(["Local NIM", "Gemini 2.0 Flash"]);
+  const [agents, setAgents] = useState<string[]>(["Local NIM", "Gemini 2.5 Flash"]);
   const [redlines, setRedlines] = useState<string[]>([
     "No uncapped indemnities without partner sign-off",
     "No remedies offered to competition authorities without partner approval",

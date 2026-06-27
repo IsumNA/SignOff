@@ -197,6 +197,10 @@ class SignOffRequest(BaseModel):
     matter_id: Optional[str] = None
     clause_ref: Optional[str] = None
     clause_title: Optional[str] = None
+    # Supervisory control context: did the partner override the AI?
+    recommended_posture: Optional[str] = None
+    override: bool = False
+    confidence: Optional[float] = None
 
 
 class SignOffRecord(BaseModel):
@@ -499,6 +503,11 @@ async def signoff(payload: SignOffRequest) -> SignOffRecord:
     )
 
     clause_label = payload.clause_ref or payload.clause_title or "clause"
+    override_note = (
+        f" — OVERRIDE of AI ({payload.recommended_posture} → {payload.posture})"
+        if payload.override and payload.recommended_posture
+        else ""
+    )
     await _audit(
         "signoff",
         matter_id=payload.matter_id,
@@ -506,7 +515,7 @@ async def signoff(payload: SignOffRequest) -> SignOffRecord:
         actor=payload.author,
         summary=(
             f"{payload.author} signed off {clause_label} → "
-            f"{payload.posture.upper()} (Tier {payload.tier})"
+            f"{payload.posture.upper()} (Tier {payload.tier}){override_note}"
         ),
         data={
             "posture": payload.posture,
@@ -514,6 +523,9 @@ async def signoff(payload: SignOffRequest) -> SignOffRecord:
             "rationale": payload.rationale,
             "clause_ref": payload.clause_ref,
             "clause_title": payload.clause_title,
+            "recommended_posture": payload.recommended_posture,
+            "override": payload.override,
+            "confidence": payload.confidence,
             "signoff_id": record.id,
         },
     )

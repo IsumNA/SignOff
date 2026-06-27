@@ -11,7 +11,7 @@ This repository is a monorepo:
 - **`frontend/`** — React (TanStack Start) UI, built with Lovable.
 
 The backend fans out three *asymmetric* agents in parallel, then fuses their
-signals in **Gemini 1.5 Pro** to produce a strict-JSON verdict.
+signals in **Gemini 2.5 Flash** to produce a strict-JSON verdict.
 
 ## Architecture
 
@@ -25,7 +25,7 @@ signals in **Gemini 1.5 Pro** to produce a strict-JSON verdict.
                        │     • Perplexity       (live web research) │
                        │                  │                         │
                        │                  ▼                         │
-                       │     Gemini 1.5 Pro  (strict JSON verdict)  │
+                       │     Gemini 2.5 Flash  (strict JSON verdict)│
                        │                  │                         │
                        │                  ▼                         │
                        │     Firestore audit trail                  │
@@ -38,7 +38,7 @@ signals in **Gemini 1.5 Pro** to produce a strict-JSON verdict.
 | ---------------- | -------------------------------------------- |
 | Frontend         | **React 19 + TanStack Start**, Tailwind, shadcn/ui |
 | API              | Python **FastAPI** (async)                   |
-| Core model       | **Vertex AI — Gemini 1.5 Pro** (strict JSON) |
+| Core model       | **Vertex AI — Gemini 2.5 Flash** (strict JSON) |
 | High-security    | **NVIDIA NIM** agent (local mock)            |
 | Graph / GraphRAG | **Neo4j** (async driver, Cypher)             |
 | State / audit    | **GCP Firestore** (async client)             |

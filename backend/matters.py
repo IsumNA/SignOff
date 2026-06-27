@@ -13,7 +13,7 @@ Provides:
 
 This is demo data — self-contained and consistent with the backend's demo mode.
 Agent labels here are display-only (Claude, GPT-4o, Harvey, ...); the real mesh
-engine remains Gemini / NIM / Neo4j / Perplexity.
+engine remains Gemini 2.5 Flash / NIM / Neo4j / Perplexity.
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ _MATTERS: List[Dict[str, Any]] = [
         "counterparty": "Recordati S.p.A.",
         "jurisdiction": "English & Italian law",
         "deal_size": "€6.7bn",
-        "agents_deployed": ["Gemini 2.0 Flash", "Claude 3.5 Sonnet", "Local NIM"],
+        "agents_deployed": ["Gemini 2.5 Flash", "Claude 3.5 Sonnet", "Local NIM"],
         "compliance_envelope": 86,
         "blockers": {"count": 2, "tier": 3, "label": "Blocker Exceptions"},
         "status": "review",
@@ -74,7 +74,7 @@ _MATTERS: List[Dict[str, Any]] = [
         "counterparty": "CK Hutchison (Three UK)",
         "jurisdiction": "English law",
         "deal_size": "£15.0bn",
-        "agents_deployed": ["Gemini 2.0 Flash", "Perplexity", "Local NIM"],
+        "agents_deployed": ["Gemini 2.5 Flash", "Perplexity", "Local NIM"],
         "compliance_envelope": 81,
         "blockers": {"count": 1, "tier": 3, "label": "Merger Control Hold"},
         "status": "review",
@@ -89,7 +89,7 @@ _MATTERS: List[Dict[str, Any]] = [
         "counterparty": "National Grid plc",
         "jurisdiction": "English law",
         "deal_size": "£4.2bn",
-        "agents_deployed": ["Gemini 2.0 Flash", "Perplexity"],
+        "agents_deployed": ["Gemini 2.5 Flash", "Perplexity"],
         "compliance_envelope": 93,
         "blockers": {"count": 1, "tier": 2, "label": "Warning"},
         "status": "warning",
@@ -104,7 +104,7 @@ _MATTERS: List[Dict[str, Any]] = [
         "counterparty": "London Stock Exchange listing",
         "jurisdiction": "English law",
         "deal_size": "£1.1bn",
-        "agents_deployed": ["Gemini 2.0 Flash", "Harvey"],
+        "agents_deployed": ["Gemini 2.5 Flash", "Harvey"],
         "compliance_envelope": 68,
         "blockers": {"count": 4, "tier": 2, "label": "Escalate Requests"},
         "status": "escalate",
@@ -119,7 +119,7 @@ _MATTERS: List[Dict[str, Any]] = [
         "counterparty": "Deutsche Bank (Arranger)",
         "jurisdiction": "New York & English law",
         "deal_size": "$3.5bn",
-        "agents_deployed": ["Gemini 2.0 Flash", "Local NIM", "Perplexity"],
+        "agents_deployed": ["Gemini 2.5 Flash", "Local NIM", "Perplexity"],
         "compliance_envelope": 100,
         "blockers": {"count": 0, "tier": 0, "label": "Passed Controls"},
         "status": "passed",
@@ -134,7 +134,7 @@ _MATTERS: List[Dict[str, Any]] = [
         "counterparty": "British Land Company plc",
         "jurisdiction": "English law",
         "deal_size": "£2.3bn",
-        "agents_deployed": ["Gemini 2.0 Flash", "Local NIM"],
+        "agents_deployed": ["Gemini 2.5 Flash", "Local NIM"],
         "compliance_envelope": 100,
         "blockers": {"count": 0, "tier": 0, "label": "Passed Controls"},
         "status": "passed",
@@ -199,7 +199,7 @@ def create_matter(data: Dict[str, Any]) -> Dict[str, Any]:
     clean (no-blocker) status, ready for the partner to watch the mesh work.
     """
     name = (data.get("name") or "Untitled Matter").strip()
-    agents = [a for a in (data.get("agents_deployed") or []) if a] or ["Gemini 2.0 Flash"]
+    agents = [a for a in (data.get("agents_deployed") or []) if a] or ["Gemini 2.5 Flash"]
     envelope = int(data.get("envelope_target") or 100)
     envelope = max(0, min(100, envelope))
 

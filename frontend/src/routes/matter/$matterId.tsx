@@ -201,7 +201,7 @@ const TIER_STYLE: Record<number, { color: string; Icon: typeof Gavel; sub: strin
 const AGENT_META: Record<string, { name: string; vendor: string; Icon: typeof Gavel; color: string }> = {
   risk: { name: "Risk Agent", vendor: "NVIDIA NIM", Icon: Gavel, color: "var(--color-foreground)" },
   precedent: { name: "Precedent Agent", vendor: "Vertex AI", Icon: Scales, color: "var(--color-foreground)" },
-  deal: { name: "Deal Agent", vendor: "Gemini 2.0 Flash", Icon: Seal, color: "var(--color-foreground)" },
+  deal: { name: "Deal Agent", vendor: "Gemini 2.5 Flash", Icon: Seal, color: "var(--color-foreground)" },
 };
 
 const EVIDENCE_META: Record<EvidenceItem["kind"], { Icon: typeof Gavel; label: string }> = {
@@ -778,6 +778,8 @@ function SignOff() {
   async function handleSignoff() {
     if (!posture || !rationale.trim() || signing || !selected) return;
     setSigning(true);
+    const recommended = analysis?.classification.recommended_posture;
+    const isOverride = !!recommended && posture !== recommended;
     try {
       await signOff({
         session_id: sessionRef.current || "session-demo",
@@ -788,6 +790,9 @@ function SignOff() {
         matter_id: matterId,
         clause_ref: selected.ref,
         clause_title: selected.title,
+        recommended_posture: recommended,
+        override: isOverride,
+        confidence: analysis?.classification.confidence,
       });
       await loadAudit();
       setRationale("");
@@ -1066,6 +1071,20 @@ function SignOff() {
                           </button>
                         );
                       })}
+                      {posture &&
+                        analysis?.classification.recommended_posture &&
+                        posture !== analysis.classification.recommended_posture && (
+                          <span
+                            title={`Overriding AI recommendation (${analysis.classification.recommended_posture})`}
+                            className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-bold uppercase tracking-wider"
+                            style={{
+                              color: "var(--color-destructive)",
+                              backgroundColor: "color-mix(in oklab, var(--color-destructive) 14%, transparent)",
+                            }}
+                          >
+                            <Gavel className="h-3 w-3" /> Override
+                          </span>
+                        )}
                       <span className="mx-0.5 h-5 w-px bg-border" />
                       {audit.some((a) => a.data?.clause_ref === c.ref) ? (
                         <span className="inline-flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-foreground">
@@ -1152,6 +1171,18 @@ function SignOff() {
                               <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold capitalize text-foreground">
                                 <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
                                 {String(a.data?.posture ?? "")} · {String(a.data?.clause_ref ?? "")}
+                                {a.data?.override === true && (
+                                  <span
+                                    className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+                                    style={{
+                                      color: "var(--color-destructive)",
+                                      backgroundColor: "color-mix(in oklab, var(--color-destructive) 14%, transparent)",
+                                    }}
+                                    title={`Override of AI recommendation (${String(a.data?.recommended_posture ?? "")})`}
+                                  >
+                                    <Gavel className="h-2.5 w-2.5" /> Override
+                                  </span>
+                                )}
                               </span>
                               <span className="font-mono text-[10px] text-muted-foreground" title={`hash ${a.hash}`}>
                                 #{a.seq} · {a.hash.slice(0, 8)}
@@ -1291,6 +1322,36 @@ function SignOff() {
                           {analysis.classification.recommended_posture}
                         </span>
                       </div>
+
+                      {/* Confidence signalling — predictive indicator of model certainty */}
+                      {(() => {
+                        const conf = analysis.classification.confidence ?? 0;
+                        const pct = Math.round(conf * 100);
+                        const low = conf < 0.75;
+                        const accent = low ? "var(--color-destructive)" : "var(--color-foreground)";
+                        return (
+                          <div className="mb-3">
+                            <div className="flex items-center justify-between text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                              <span>Model confidence</span>
+                              <span className="font-mono tabular-nums" style={{ color: accent }}>{pct}%</span>
+                            </div>
+                            <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-muted/50">
+                              <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: accent }} />
+                            </div>
+                            {low && (
+                              <div className="mt-2 flex items-start gap-2 rounded-lg border px-3 py-2 text-[11px] leading-relaxed animate-reveal"
+                                style={{
+                                  borderColor: "color-mix(in oklab, var(--color-destructive) 35%, var(--color-border))",
+                                  color: "var(--color-foreground)",
+                                }}>
+                                <Gavel className="mt-px h-3.5 w-3.5 shrink-0 text-[color:var(--color-destructive)]" />
+                                <span><strong className="font-semibold">Low confidence / elevated uncertainty.</strong> The mesh signals possible ambiguity or conflicting evidence — verify manually before sign-off.</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
                       {renderReasoning(dealAgent?.reasoning || dealAgent?.summary || "")}
                     </div>
 
@@ -1605,6 +1666,29 @@ function SignOff() {
                   </span>
                 )}
               </div>
+
+              {/* Override notice — partner is deciding against the AI recommendation */}
+              {analysis &&
+                posture &&
+                posture !== analysis.classification.recommended_posture && (
+                  <div
+                    className="flex items-start gap-2 rounded-lg border px-3 py-2.5 text-[12px] leading-relaxed"
+                    style={{
+                      borderColor: "color-mix(in oklab, var(--color-destructive) 35%, var(--color-border))",
+                    }}
+                  >
+                    <Gavel className="mt-px h-4 w-4 shrink-0 text-[color:var(--color-destructive)]" />
+                    <span className="text-foreground">
+                      <strong className="font-semibold">Supervisory override.</strong> You are
+                      recording <span className="font-semibold capitalize">{posture}</span> against
+                      the AI recommendation of{" "}
+                      <span className="font-semibold capitalize">
+                        {analysis.classification.recommended_posture}
+                      </span>
+                      . This is logged as an accountable override.
+                    </span>
+                  </div>
+                )}
               <div>
                 <label htmlFor="rationale" className="mb-1.5 flex items-center gap-1.5">
                   <PenLine className="h-3.5 w-3.5 text-muted-foreground" />

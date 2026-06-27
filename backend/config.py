@@ -1,7 +1,7 @@
 """SignOff backend — configuration and client initialization.
 
 Centralizes environment loading and lazily-initialized singleton clients for:
-  * Vertex AI (Gemini 1.5 Pro) — core reasoning model
+  * Vertex AI (Gemini 2.5 Flash) — core reasoning model
   * Firestore — session state & audit trail
   * Neo4j (async driver) — precedent / citation graph
 
@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     # --- Google Cloud / Vertex AI ---
     gcp_project_id: str = "your-gcp-project-id"
     gcp_location: str = "us-central1"
-    vertex_model: str = "gemini-2.0-flash"
+    vertex_model: str = "gemini-2.5-flash"
 
     # --- Firestore ---
     firestore_database: str = "(default)"
@@ -169,7 +169,7 @@ def integration_status() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Vertex AI (Gemini 1.5 Pro)
+# Vertex AI (Gemini 2.5 Flash)
 # ---------------------------------------------------------------------------
 _vertex_initialized = False
 
@@ -195,7 +195,7 @@ def init_vertex() -> None:
 
 @lru_cache(maxsize=1)
 def get_gemini_model():
-    """Return a cached Gemini 1.5 Pro generative model handle.
+    """Return a cached Gemini 2.5 Flash generative model handle.
 
     Strict JSON output is enforced at the call site via per-request
     ``generation_config`` (see ``mesh.py``) so the same model handle can be

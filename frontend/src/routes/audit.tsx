@@ -5,6 +5,7 @@ import { getAudit, getMatters, type AuditRecord, type Matter } from "@/lib/api";
 import { Brand } from "@/components/Brand";
 import {
   DocumentFold,
+  Gavel,
   ReviewGlass,
   Seal,
   SignatureLine,
@@ -155,6 +156,18 @@ function AuditTrail() {
                           >
                             {meta.label}
                           </span>
+                          {e.data?.override === true && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                              style={{
+                                color: "var(--color-destructive)",
+                                backgroundColor: "color-mix(in oklab, var(--color-destructive) 14%, transparent)",
+                              }}
+                              title={`Override of AI recommendation (${String(e.data?.recommended_posture ?? "")})`}
+                            >
+                              <Gavel className="h-3 w-3" /> Override
+                            </span>
+                          )}
                           <span className="text-[13px] font-medium text-foreground">{e.summary}</span>
                         </div>
                         <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">

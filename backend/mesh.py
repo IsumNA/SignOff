@@ -6,7 +6,7 @@ The mesh fans out three *asymmetric* agents concurrently (``asyncio.gather``):
   2. Neo4j GraphRAG precedent agent  — graph-grounded precedent/citation context
   3. Perplexity research agent       — live, web-grounded external legal search
 
-Their outputs are fused inside **Gemini 1.5 Pro** (strict JSON) into the
+Their outputs are fused inside **Gemini 2.5 Flash** (strict JSON) into the
 structure the SignOff frontend consumes: a classification (Tier 1/2/3), the
 per-agent reasoning trace, supporting evidence, and tool-call traces.
 
@@ -288,7 +288,7 @@ def _demo_synthesis(
         },
         {
             "agent": "Deal Agent",
-            "model": "Gemini 1.5 Pro",
+            "model": "Gemini 2.5 Flash",
             "summary": f"Synthesized verdict: Tier {tier} · {TIER_LABEL[tier]}.",
             "mode": "live" if vertex_is_live() else "demo",
             "findings": triggers,
@@ -325,7 +325,7 @@ def _demo_synthesis(
 
 
 # ---------------------------------------------------------------------------
-# Live synthesis — Gemini 1.5 Pro, strict JSON
+# Live synthesis — Gemini 2.5 Flash, strict JSON
 # ---------------------------------------------------------------------------
 _SYNTH_SYSTEM = """\
 You are the SignOff synthesizer for an asymmetric legal-risk multi-agent mesh.
