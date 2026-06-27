@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     # --- Google Cloud / Vertex AI ---
     gcp_project_id: str = "your-gcp-project-id"
     gcp_location: str = "us-central1"
-    vertex_model: str = "gemini-1.5-pro"
+    vertex_model: str = "gemini-2.0-flash"
 
     # --- Firestore ---
     firestore_database: str = "(default)"
