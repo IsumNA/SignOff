@@ -88,7 +88,7 @@ function StageTrack({ stage }: { stage: MatterStage }) {
 // Building blocks
 // ---------------------------------------------------------------------------
 
-function SummaryCard({
+function StatCell({
   Icon,
   label,
   value,
@@ -103,23 +103,21 @@ function SummaryCard({
 }) {
   const accent = danger ? "var(--color-destructive)" : "var(--color-muted-foreground)";
   return (
-    <div className="group flex items-center gap-4 rounded-xl border border-border bg-card/40 px-5 py-4 transition-colors hover:border-border-strong">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border" style={{ color: accent }}>
-        <Icon className="h-5 w-5" />
-      </span>
+    <div className="flex items-center gap-3.5 px-6 py-3.5 sm:flex-1 sm:first:pl-0 sm:last:pr-0">
+      <Icon className="h-4 w-4 shrink-0" style={{ color: accent }} />
       <div className="min-w-0">
-        <div className="flex items-baseline gap-1.5">
+        <span className="block text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+          {label}
+        </span>
+        <div className="mt-1 flex items-baseline gap-1.5">
           <span
-            className="font-serif text-[26px] font-medium leading-none tracking-tight tabular-nums"
+            className="font-serif text-[22px] font-medium leading-none tracking-tight tabular-nums"
             style={danger ? { color: "var(--color-destructive)" } : undefined}
           >
             {value}
           </span>
-          {hint && <span className="text-[11px] text-muted-foreground">{hint}</span>}
+          {hint && <span className="text-[10px] text-muted-foreground">{hint}</span>}
         </div>
-        <span className="mt-1.5 block text-[10.5px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-          {label}
-        </span>
       </div>
     </div>
   );
@@ -277,26 +275,26 @@ function Ledger() {
             </p>
           </div>
 
-          {/* Summary strip */}
-          <div className="mb-9 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <SummaryCard
+          {/* Executive control strip — low-profile, high-density metric bar */}
+          <div className="mb-9 flex flex-col border-y border-border divide-y divide-border sm:flex-row sm:divide-x sm:divide-y-0">
+            <StatCell
               Icon={DocumentFold}
               label="Active Matters"
               value={summary ? String(summary.total_matters) : "—"}
             />
-            <SummaryCard
+            <StatCell
               Icon={Gavel}
               label="Open Blockers"
               value={summary ? String(summary.total_blockers) : "—"}
               danger={!!summary && summary.total_blockers > 0}
               hint="pending review"
             />
-            <SummaryCard
+            <StatCell
               Icon={Scales}
               label="Avg Compliance Envelope"
               value={summary ? `${summary.avg_envelope}%` : "—"}
             />
-            <SummaryCard
+            <StatCell
               Icon={SignatureLine}
               label="Ready to Sign"
               value={summary ? String(summary.ready_to_sign) : "—"}
