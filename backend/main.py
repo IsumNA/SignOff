@@ -386,7 +386,9 @@ async def _audit(
         summary=summary,
         data=data,
     )
-    await _mirror_to_firestore(record)
+    # Mirror to Firestore off the critical path: the local hash chain is the
+    # source of truth, so the response (e.g. a sign-off) never waits on GCP.
+    asyncio.create_task(_mirror_to_firestore(record))
     return record
 
 
