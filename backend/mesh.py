@@ -1,14 +1,23 @@
-"""SignOff backend — Asymmetric Multi-Agent Mesh.
+"""SignOff backend — Asymmetric Multi-Agent Mesh (Google ADK).
 
-The mesh fans out three *asymmetric* agents concurrently (``asyncio.gather``):
+Orchestrated with the **Google Agent Development Kit (ADK)**. A ``SequentialAgent``
+runs two stages:
 
-  1. NIM local high-security agent   — sensitive on-prem clause assessment
-  2. Neo4j GraphRAG precedent agent  — graph-grounded precedent/citation context
-  3. Perplexity research agent       — live, web-grounded external legal search
+  1. ``ParallelAgent`` — fans out the asymmetric agents concurrently:
+       • Risk agent       — NVIDIA Nemotron on-prem high-security clause assessment
+       • Precedent agent  — Neo4j GraphRAG precedent/citation context
+       • Precedent agent  — EU Publications Office authoritative legislation
+       • Precedent agent  — Perplexity live, web-grounded external research
+  2. ``SynthAgent``     — fuses the signals inside **Gemini 2.5 Flash** (strict JSON).
 
-Their outputs are fused inside **Gemini 2.5 Flash** (strict JSON) into the
-structure the SignOff frontend consumes: a classification (Tier 1/2/3), the
-per-agent reasoning trace, supporting evidence, and tool-call traces.
+The whole graph executes via an ADK ``InMemoryRunner``. The agents wrap the
+proven tool calls, so behaviour (traces, tiers, evidence) is unchanged; ADK now
+owns the execution graph. If the ADK runtime ever errs, the mesh transparently
+falls back to direct asyncio execution so a review can never break on stage.
+
+The fused result is the structure the SignOff frontend consumes: a classification
+(Tier 1/2/3), the per-agent reasoning trace, supporting evidence, and tool-call
+traces.
 
 When cloud credentials are absent the mesh runs in **demo mode** — a fully
 deterministic local synthesis so the UI is usable end-to-end without GCP,
@@ -451,66 +460,58 @@ async def _gemini_synthesis(
 
 
 # ---------------------------------------------------------------------------
-# Public entrypoint
+# Shared work units — used by both the ADK agents and the direct fallback
 # ---------------------------------------------------------------------------
-async def run_mesh(
-    message: str, session_id: str, jurisdiction: str = "EU", clause_type: str = ""
-) -> Dict[str, Any]:
-    """Run the full asymmetric mesh and return a frontend-shaped ChatResponse.
+# Per-tool metadata: (agent label, tool name for traces, human detail).
+_TOOL_SPECS: Dict[str, Tuple[str, str, str]] = {
+    "nim": ("Risk Agent", "nvidia_nim_infer", "Confidential risk review of the clause text."),
+    "graph": ("Precedent Agent", "query_neo4j_graph", "Precedent and citation search."),
+    "eu": (
+        "Precedent Agent",
+        "query_eu_cellar_api",
+        "Live EU legislation check (EU Publications Office).",
+    ),
+    "web": ("Precedent Agent", "query_perplexity_research", "Live legal research."),
+}
+_TOOL_ORDER: Tuple[str, ...] = ("nim", "graph", "eu", "web")
 
-    Always returns a valid structure: live signals where credentials exist,
-    deterministic demo synthesis otherwise. Individual tool failures degrade
-    gracefully and are surfaced in ``traces``.
-    """
-    clause_text = message
-    effective_type = clause_type or clause_text[:80]
-    traces: List[Dict[str, Any]] = []
 
-    logger.info("Mesh run start (session=%s, jurisdiction=%s)", session_id, jurisdiction)
+def _tool_mode(which: str) -> str:
+    return {
+        "nim": "live" if nim_is_live() else "demo",
+        "graph": "live" if neo4j_is_live() else "demo",
+        "eu": "live",  # public EU Publications Office — no key, genuinely live
+        "web": "live" if perplexity_is_live() else "demo",
+    }[which]
 
-    # --- Parallel asymmetric fan-out -------------------------------------
-    (
-        (nim, nim_trace),
-        (graph, graph_trace),
-        (eu, eu_trace),
-        (web, web_trace),
-    ) = await asyncio.gather(
-        _run_tool(
-            session_id,
-            "Risk Agent",
-            "nvidia_nim_infer",
-            "live" if nim_is_live() else "demo",
-            assess_local_risk(clause_text),
-            "Confidential risk review of the clause text.",
-        ),
-        _run_tool(
-            session_id,
-            "Precedent Agent",
-            "query_neo4j_graph",
-            "live" if neo4j_is_live() else "demo",
-            query_precedents(effective_type),
-            "Precedent and citation search.",
-        ),
-        _run_tool(
-            session_id,
-            "Precedent Agent",
-            "query_eu_cellar_api",
-            "live",  # public EU Publications Office — no key, genuinely live
-            search_eu_legislation(clause_text),
-            "Live EU legislation check (EU Publications Office).",
-        ),
-        _run_tool(
-            session_id,
-            "Precedent Agent",
-            "query_perplexity_research",
-            "live" if perplexity_is_live() else "demo",
-            research_clause(clause_text, jurisdiction),
-            "Live legal research.",
-        ),
+
+def _tool_coro(which: str, store: Dict[str, Any]) -> Awaitable[Dict[str, Any]]:
+    clause = store["clause_text"]
+    return {
+        "nim": lambda: assess_local_risk(clause),
+        "graph": lambda: query_precedents(store["effective_type"]),
+        "eu": lambda: search_eu_legislation(clause),
+        "web": lambda: research_clause(clause, store["jurisdiction"]),
+    }[which]()
+
+
+async def _do_tool(store: Dict[str, Any], which: str) -> None:
+    """Run one asymmetric tool and stash its result + trace in the run store."""
+    agent_label, tool_name, detail = _TOOL_SPECS[which]
+    result, trace = await _run_tool(
+        store["sse_id"], agent_label, tool_name, _tool_mode(which), _tool_coro(which, store), detail
     )
-    traces.extend([nim_trace, graph_trace, eu_trace, web_trace])
+    store[which] = result
+    store["trace_" + which] = trace
 
-    # --- Synthesis (Gemini live, deterministic demo otherwise) -----------
+
+async def _do_synth(store: Dict[str, Any]) -> None:
+    """Fuse the fan-out signals into the final risk verdict (Gemini, then demo)."""
+    session_id = store["sse_id"]
+    clause_text = store["clause_text"]
+    jurisdiction = store["jurisdiction"]
+    nim, graph, web, eu = store["nim"], store["graph"], store["web"], store["eu"]
+
     synth_id = str(uuid.uuid4())
     synth_mode = "live" if vertex_is_live() else "demo"
     synth_detail = "Combine all findings into a single risk rating."
@@ -564,20 +565,146 @@ async def run_mesh(
         "payload": {"duration_ms": int((perf_counter() - synth_t0) * 1000)},
     }
     events.publish(session_id, synth_trace)
-    traces.append(synth_trace)
 
     demo = not vertex_is_live() or synth_status == "failed"
-    evidence = _build_evidence(graph, web, eu, demo, effective_type)
+    store["synth_result"] = synthesized
+    store["trace_synth"] = synth_trace
+    store["evidence"] = _build_evidence(graph, web, eu, demo, store["effective_type"])
 
-    # Close out the live stream for any attached SSE subscribers.
-    events.mark_done(session_id)
 
-    return {
-        "session_id": session_id,
-        "answer": synthesized.get("answer", ""),
-        "classification": synthesized["classification"],
-        "agents": synthesized["agents"],
-        "evidence": evidence,
-        "traces": traces,
-        "created_at": _now(),
+# ---------------------------------------------------------------------------
+# Google ADK orchestration layer
+# ---------------------------------------------------------------------------
+# Custom ADK agents share their per-run data through this registry (keyed by a
+# unique run id) rather than pydantic-validated fields, so the shared dict is
+# never copied by the model layer.
+_RUN_STORES: Dict[str, Dict[str, Any]] = {}
+_ADK_APP = "signoff"
+_ADK_USER = "supervisor"
+
+
+def _build_adk_imports():
+    """Import ADK lazily so a missing/broken install degrades to direct mode."""
+    from google.adk.agents import BaseAgent, ParallelAgent, SequentialAgent
+    from google.adk.events import Event
+    from google.adk.runners import InMemoryRunner
+    from google.genai import types as genai_types
+
+    class _ToolAgent(BaseAgent):
+        """ADK agent that runs one asymmetric tool into the shared run store."""
+
+        which: str
+        run_key: str
+
+        async def _run_async_impl(self, ctx):  # type: ignore[override]
+            await _do_tool(_RUN_STORES[self.run_key], self.which)
+            yield Event(author=self.name, invocation_id=ctx.invocation_id)
+
+    class _SynthAgent(BaseAgent):
+        """ADK agent that fuses the fan-out into the final verdict."""
+
+        run_key: str
+
+        async def _run_async_impl(self, ctx):  # type: ignore[override]
+            await _do_synth(_RUN_STORES[self.run_key])
+            yield Event(author=self.name, invocation_id=ctx.invocation_id)
+
+    return _ToolAgent, _SynthAgent, ParallelAgent, SequentialAgent, InMemoryRunner, genai_types
+
+
+async def _run_via_adk(store: Dict[str, Any], run_key: str) -> None:
+    """Execute the mesh through Google ADK (ParallelAgent ▸ SynthAgent)."""
+    (
+        _ToolAgent,
+        _SynthAgent,
+        ParallelAgent,
+        SequentialAgent,
+        InMemoryRunner,
+        genai_types,
+    ) = _build_adk_imports()
+
+    fan_out = ParallelAgent(
+        name="asymmetric_fan_out",
+        sub_agents=[
+            _ToolAgent(name=f"{which}_agent", which=which, run_key=run_key)
+            for which in _TOOL_ORDER
+        ],
+    )
+    synth = _SynthAgent(name="synthesis_agent", run_key=run_key)
+    root = SequentialAgent(name="signoff_mesh", sub_agents=[fan_out, synth])
+
+    runner = InMemoryRunner(agent=root, app_name=_ADK_APP)
+    session_id = store["sse_id"]
+    await runner.session_service.create_session(
+        app_name=_ADK_APP, user_id=_ADK_USER, session_id=session_id, state={}
+    )
+    message = genai_types.Content(
+        role="user", parts=[genai_types.Part(text=store["clause_text"])]
+    )
+    async for _ in runner.run_async(
+        user_id=_ADK_USER, session_id=session_id, new_message=message
+    ):
+        pass
+
+
+async def _run_direct(store: Dict[str, Any]) -> None:
+    """Fallback: run the same work units directly with asyncio (no ADK)."""
+    await asyncio.gather(*[_do_tool(store, which) for which in _TOOL_ORDER])
+    await _do_synth(store)
+
+
+# ---------------------------------------------------------------------------
+# Public entrypoint
+# ---------------------------------------------------------------------------
+async def run_mesh(
+    message: str, session_id: str, jurisdiction: str = "EU", clause_type: str = ""
+) -> Dict[str, Any]:
+    """Run the full asymmetric mesh and return a frontend-shaped ChatResponse.
+
+    Orchestrated by Google ADK (``SequentialAgent`` of a ``ParallelAgent`` and a
+    synthesis agent). Always returns a valid structure: live signals where
+    credentials exist, deterministic demo synthesis otherwise. Individual tool
+    failures degrade gracefully and are surfaced in ``traces``. If the ADK
+    runtime itself fails, the run falls back to direct execution.
+    """
+    run_key = str(uuid.uuid4())
+    store: Dict[str, Any] = {
+        "clause_text": message,
+        "effective_type": clause_type or message[:80],
+        "jurisdiction": jurisdiction,
+        "sse_id": session_id,
     }
+    _RUN_STORES[run_key] = store
+
+    logger.info("Mesh run start (session=%s, jurisdiction=%s)", session_id, jurisdiction)
+
+    try:
+        try:
+            await _run_via_adk(store, run_key)
+            logger.info("Mesh orchestrated via Google ADK (session=%s)", session_id)
+        except Exception:  # noqa: BLE001 — ADK runtime issue → never break a review
+            logger.exception("ADK orchestration failed; using direct execution")
+            # Re-run any units the ADK attempt didn't complete.
+            if not all(w in store for w in _TOOL_ORDER) or "synth_result" not in store:
+                await _run_direct(store)
+
+        traces = [
+            store[f"trace_{w}"] for w in _TOOL_ORDER if f"trace_{w}" in store
+        ]
+        if "trace_synth" in store:
+            traces.append(store["trace_synth"])
+
+        synthesized = store["synth_result"]
+        return {
+            "session_id": session_id,
+            "answer": synthesized.get("answer", ""),
+            "classification": synthesized["classification"],
+            "agents": synthesized["agents"],
+            "evidence": store.get("evidence", []),
+            "traces": traces,
+            "created_at": _now(),
+        }
+    finally:
+        # Close out the live stream for any attached SSE subscribers + cleanup.
+        events.mark_done(session_id)
+        _RUN_STORES.pop(run_key, None)

@@ -2,16 +2,18 @@
 # Backend dependencies
 
 # --- Web framework (async) ---
-fastapi==0.115.6
+# Note: fastapi/pydantic pinned to versions compatible with google-adk 2.3.0.
+fastapi==0.138.1
 uvicorn[standard]==0.34.0
-pydantic==2.10.4
-pydantic-settings==2.7.1
+pydantic==2.13.4
+pydantic-settings==2.14.2
 
-# --- Google Cloud / Vertex AI / ADK ---
+# --- Google Cloud / Vertex AI / ADK (multi-agent orchestration) ---
 google-cloud-firestore==2.20.0
 google-cloud-aiplatform==1.75.0
 vertexai==1.43.0
-google-adk==0.2.0
+google-adk==2.3.0
+google-genai==2.10.0
 
 # --- Neo4j graph database (async driver) ---
 neo4j==5.27.0

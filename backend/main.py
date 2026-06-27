@@ -520,9 +520,27 @@ async def matter_tasks(matter_id: str) -> TasksResponse:
     return TasksResponse(**list_tasks(matter_id))
 
 
+# In-process cache of completed reviews so re-opening the same clause is instant.
+# The first review of a clause runs fully live; identical follow-ups (same clause
+# text + jurisdiction + type) reuse that live result. Cleared on restart. This
+# keeps a live demo responsive without faking anything — it's the real result.
+_CHAT_CACHE: Dict[str, Dict[str, Any]] = {}
+
+
+def _chat_cache_key(payload: "ChatRequest") -> str:
+    return f"{payload.jurisdiction}||{payload.clause_type}||{payload.message.strip()}"
+
+
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(payload: ChatRequest) -> ChatResponse:
     """Run the asymmetric mesh on a clause / question and audit the result."""
+    cache_key = _chat_cache_key(payload)
+    cached = _CHAT_CACHE.get(cache_key)
+    if cached is not None:
+        logger.info("Chat cache hit (session=%s) — returning prior live result", payload.session_id)
+        trace_events.mark_done(payload.session_id)
+        return ChatResponse(**cached)
+
     try:
         result = await run_mesh(
             message=payload.message,
@@ -539,6 +557,8 @@ async def chat(payload: ChatRequest) -> ChatResponse:
     finally:
         # Guarantee any attached SSE stream closes, even on failure.
         trace_events.mark_done(payload.session_id)
+
+    _CHAT_CACHE[cache_key] = result
 
     cls = result["classification"]
     live_tools = [t["tool"] for t in result.get("traces", []) if t.get("mode") == "live"]

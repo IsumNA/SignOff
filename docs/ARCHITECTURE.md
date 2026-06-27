@@ -35,18 +35,23 @@ at once:
 
 Inside the backend (`mesh.py → run_mesh`):
 
+The review is orchestrated with the **Google Agent Development Kit (ADK)**. A
+`SequentialAgent` runs a `ParallelAgent` (the fan-out) and then a synthesis agent,
+all driven by an ADK `InMemoryRunner`:
+
 ```
 run_mesh(message, session_id, jurisdiction, clause_type)
   │
-  ├─ asyncio.gather(  ← all four run in parallel
-  │     assess_local_risk()        → NVIDIA Nemotron (confidential risk)
-  │     query_precedents()         → Neo4j precedent graph
-  │     search_eu_legislation()    → EU Publications Office (Cellar SPARQL, live)
-  │     research_clause()          → Perplexity (live legal research)
-  │  )
-  │     each tool publishes a "running" then a "success/failed" trace frame
+  ├─ Google ADK: InMemoryRunner( SequentialAgent[ ... ] )
   │
-  ├─ synthesis:
+  ├─ Stage 1 — ParallelAgent  ← four ADK agents run concurrently
+  │     RiskAgent       → assess_local_risk()     → NVIDIA Nemotron (confidential risk)
+  │     PrecedentAgent  → query_precedents()      → Neo4j precedent graph
+  │     PrecedentAgent  → search_eu_legislation() → EU Publications Office (Cellar SPARQL)
+  │     PrecedentAgent  → research_clause()       → Perplexity (live legal research)
+  │        each agent publishes a "running" then a "success/failed" trace frame
+  │
+  ├─ Stage 2 — SynthAgent:
   │     Gemini 2.5 Flash fuses the signals into strict JSON
   │     (tier, recommended posture, confidence, per-reviewer reasoning)
   │     — falls back to a deterministic demo synthesis if Vertex isn't live
@@ -54,6 +59,10 @@ run_mesh(message, session_id, jurisdiction, clause_type)
   ├─ events.mark_done(session_id)   ← closes the SSE stream
   └─ returns ChatResponse {classification, agents[], evidence[], traces[]}
 ```
+
+If the ADK runtime itself ever errors, `run_mesh` transparently falls back to
+running the same work units directly with `asyncio.gather`, so a review can never
+break on stage.
 
 The response shape is mirrored exactly by `frontend/src/lib/api.ts`, so the
 contract between the two halves lives in one typed place.
@@ -65,7 +74,7 @@ contract between the two halves lives in one typed place.
 | Module | Responsibility |
 | --- | --- |
 | `main.py` | The FastAPI app and **every HTTP route**. Thin: validates input (Pydantic), calls a module, writes an audit record. Start here to see the API surface. |
-| `mesh.py` | Orchestrates the parallel review and the Gemini synthesis. Publishes trace frames as each step runs. Contains both the live and the deterministic demo synthesis. |
+| `mesh.py` | Orchestrates the review with **Google ADK** (`SequentialAgent` ▸ `ParallelAgent` ▸ synthesis agent, run via `InMemoryRunner`) and the Gemini synthesis. Publishes trace frames as each step runs. Contains the live and the deterministic demo synthesis, plus a direct-execution fallback if ADK errors. |
 | `tools.py` | The individual reviewers, one async function each: Neo4j precedents, EU Cellar SPARQL, Perplexity research, NVIDIA Nemotron risk. Each degrades to a structured error or demo payload instead of raising. |
 | `insights.py` | Portfolio learning. `portfolio_insights()` derives cross-matter patterns to scrutinise; `suggest_plan()` recommends a setup for a new matter from comparable matters. |
 | `audit.py` | The tamper-proof audit log (see §4). |

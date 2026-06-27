@@ -103,15 +103,15 @@ flowchart TD
     UI -->|"POST /api/chat"| API
     UI -.->|"GET /api/trace/:id/stream (SSE, live)"| API
 
-    subgraph FANOUT["Parallel review (asyncio.gather)"]
+    subgraph FANOUT["Google ADK ParallelAgent (concurrent fan-out)"]
         NIM["NVIDIA Nemotron<br/>confidential risk review"]
         NEO["Neo4j<br/>precedent graph"]
         EU["EU Publications Office<br/>live EU legislation (SPARQL)"]
         PPLX["Perplexity<br/>live legal research"]
     end
 
-    API --> FANOUT
-    FANOUT --> SYNTH["Gemini 2.5 Flash<br/>fuse signals → risk tier (strict JSON)"]
+    API -->|"Google ADK Runner · SequentialAgent"| FANOUT
+    FANOUT --> SYNTH["Gemini 2.5 Flash (ADK SynthAgent)<br/>fuse signals → risk tier (strict JSON)"]
     SYNTH --> RESULT["Verdict: tier · reasoning · evidence · confidence"]
     RESULT --> UI
 
@@ -142,6 +142,7 @@ insights engine work.
 | --- | --- | --- |
 | Frontend | React 19 + **TanStack Start**, Tailwind, shadcn/ui | always |
 | API | Python **FastAPI** (async) | always |
+| Multi-agent orchestration | **Google Agent Development Kit (ADK)** — `SequentialAgent` ▸ `ParallelAgent` ▸ synthesis agent via `InMemoryRunner` | always (direct-execution fallback) |
 | Synthesis / reasoning | **Vertex AI — Gemini 2.5 Flash** (strict JSON) | GCP credentials present |
 | Confidential risk review | **NVIDIA Nemotron** (NIM, OpenAI-compatible API) | `NVIDIA_API_KEY` present |
 | Precedent graph | **Neo4j** (async, Cypher) | Neo4j credentials present |
@@ -259,7 +260,7 @@ SignOff/
 │
 ├── backend/                       ← FastAPI service (the review engine)
 │   ├── main.py                    ← app + all HTTP routes (the API surface)
-│   ├── mesh.py                    ← parallel multi-agent review + Gemini synthesis
+│   ├── mesh.py                    ← Google ADK multi-agent orchestration + Gemini synthesis
 │   ├── tools.py                   ← the individual reviewers (Nemotron, Neo4j, EU, Perplexity)
 │   ├── insights.py                ← portfolio learning: scrutiny patterns + plan suggestions
 │   ├── audit.py                   ← tamper-proof hash-chained audit log
