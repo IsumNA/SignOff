@@ -298,6 +298,24 @@ async def _mirror_to_firestore(entry: Dict[str, Any]) -> None:
         logger.exception("Failed to mirror audit log (id=%s)", entry.get("id"))
 
 
+# Maps each tool to the model / service that performed it, for audit attribution.
+# Ordered so the actor string reads reasoning-first, then retrieval signals.
+_TOOL_ATTRIBUTION: List[tuple[str, str]] = [
+    ("nvidia_nim_infer", "NVIDIA Nemotron"),
+    ("gemini_reason", "Gemini 2.5 Flash"),
+    ("query_neo4j_graph", "Neo4j GraphRAG"),
+    ("query_eu_cellar_api", "EU Cellar"),
+    ("query_perplexity_research", "Perplexity"),
+]
+
+
+def _models_actor(result: Dict[str, Any]) -> str:
+    """Build the audit actor from the models/services that actually ran."""
+    tools = {t.get("tool") for t in result.get("traces", [])}
+    names = [name for tool, name in _TOOL_ATTRIBUTION if tool in tools]
+    return ", ".join(names) if names else "agent mesh"
+
+
 async def _audit(
     event_type: str,
     *,
@@ -428,7 +446,7 @@ async def chat(payload: ChatRequest) -> ChatResponse:
     await _audit(
         "analysis",
         session_id=payload.session_id,
-        actor="mesh",
+        actor=_models_actor(result),
         summary=(
             f"Clause analyzed → Tier {cls['tier']} ({cls['tier_label']}), "
             f"posture {cls['recommended_posture']}"
@@ -557,7 +575,7 @@ async def analyze_clause_endpoint(payload: AnalyzeClauseRequest) -> ChatResponse
         "analysis",
         matter_id=payload.deal_id,
         session_id=session_id,
-        actor="mesh",
+        actor=_models_actor(result),
         summary=(
             f"Clause analyzed → Tier {cls['tier']} ({cls['tier_label']}), "
             f"posture {cls['recommended_posture']}"

@@ -174,9 +174,7 @@ function PlanMatter() {
       {/* Topbar */}
       <header className="flex items-center justify-between gap-4 border-b border-border bg-surface/60 px-6 py-3">
         <div className="flex items-center gap-2.5 min-w-0">
-          <Link to="/" className="min-w-0">
-            <Brand />
-          </Link>
+          <Brand className="min-w-0" />
           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="truncate text-[13px] font-medium text-muted-foreground">Plan a matter</span>
         </div>

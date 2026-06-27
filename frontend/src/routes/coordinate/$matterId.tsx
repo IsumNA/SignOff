@@ -101,9 +101,7 @@ function Coordinate() {
       {/* Topbar */}
       <header className="flex items-center justify-between gap-4 border-b border-border bg-surface/60 px-6 py-3">
         <div className="flex items-center gap-2.5 min-w-0">
-          <Link to="/">
-            <Brand />
-          </Link>
+          <Brand />
           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="truncate text-[13px] font-medium">{name}</span>
           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />

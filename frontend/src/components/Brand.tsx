@@ -1,13 +1,20 @@
+import { Link } from "@tanstack/react-router";
+
 /**
  * The single source of truth for the SignOff wordmark.
  *
  * A serif wordmark (legal gravity) paired with a drawn signature stroke that
  * sits on a baseline — the literal act the product is named for. Monochrome,
- * no gradients, identical across every screen.
+ * no gradients, identical across every screen. Clicking it returns to the
+ * Multi-Matter Ledger (home).
  */
-export function Brand({ className = "" }: { className?: string }) {
+export function Brand({ className = "", to = "/" }: { className?: string; to?: string }) {
   return (
-    <span className={`flex items-center gap-2.5 ${className}`}>
+    <Link
+      to={to}
+      aria-label="SignOff — back to the ledger"
+      className={`flex items-center gap-2.5 rounded-md transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring ${className}`}
+    >
       <span className="flex h-7 w-7 items-center justify-center rounded-md border border-border-strong bg-card">
         <svg
           width="17"
@@ -31,6 +38,6 @@ export function Brand({ className = "" }: { className?: string }) {
       <span className="font-serif text-[19px] font-medium leading-none tracking-[-0.01em] text-foreground">
         SignOff
       </span>
-    </span>
+    </Link>
   );
 }

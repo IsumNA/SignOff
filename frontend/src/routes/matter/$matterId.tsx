@@ -830,9 +830,7 @@ function SignOff() {
             <span className="text-[11px] font-medium">Coordinate</span>
           </Link>
           <span className="h-4 w-px bg-border" />
-          <Link to="/">
-            <Brand />
-          </Link>
+          <Brand />
           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="truncate font-serif text-[15px] font-medium tracking-[-0.01em]">{deal.name}</span>
           <span className="hidden md:inline rounded-md border border-border bg-surface-elevated px-2 py-0.5 font-mono text-[10px] text-muted-foreground">

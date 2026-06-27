@@ -231,16 +231,16 @@ function Ledger() {
         </div>
         <div className="flex items-center gap-4">
           <Link
-            to="/audit"
-            className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground transition hover:text-foreground"
-          >
-            <Seal className="h-3.5 w-3.5" /> Audit trail
-          </Link>
-          <Link
             to="/plan"
             className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-1.5 text-[12px] font-semibold text-background transition hover:opacity-90"
           >
             <Plus className="h-3.5 w-3.5" /> New Matter
+          </Link>
+          <Link
+            to="/audit"
+            className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground transition hover:text-foreground"
+          >
+            <Seal className="h-3.5 w-3.5" /> Audit trail
           </Link>
           <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <span
