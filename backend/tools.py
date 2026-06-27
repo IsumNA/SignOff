@@ -182,6 +182,100 @@ async def research_clause(clause_text: str, jurisdiction: str = "EU") -> Dict[st
 
 
 # ---------------------------------------------------------------------------
+# EU Publications Office (Cellar) — real, web-grounded regulatory context
+# ---------------------------------------------------------------------------
+# Public SPARQL endpoint over the EU's Common Metadata Model (CDM). No API key
+# required — authoritative EU legislation, ideal for grounding regulatory risk.
+_EU_CELLAR_ENDPOINT = "http://publications.europa.eu/webapi/rdf/sparql"
+
+# Map clause language → an EU subject area that maps onto real legislation
+# titles (contract-mechanics words like "indemnity" don't appear in EU titles).
+_EU_KEYWORD_MAP: List[tuple] = [
+    (("personal data", "data protection", "gdpr", "privacy", "processing"), "data protection"),
+    (("competit", "antitrust", "merger control", "state aid", "cartel", "dominant position"), "competition"),
+    (("consumer",), "consumer"),
+    (("financial", "securities", "capital market", "investment", "credit institution"), "financial"),
+    (("environment", "emission", "climate", "sustainab"), "environmental"),
+    (("energy", "electricity", "gas supply"), "energy"),
+    (("employment", "worker", "labour", "labor"), "employment"),
+    (("intellectual property", "copyright", "trademark", "patent"), "intellectual property"),
+    (("anti-money", "money laundering", "sanction", "bribery", "corrupt"), "money laundering"),
+]
+
+
+def _eu_keyword(text: str) -> str:
+    low = (text or "").lower()
+    for keys, term in _EU_KEYWORD_MAP:
+        if any(k in low for k in keys):
+            return term
+    return "contract"
+
+
+def _eu_sparql(term: str, limit: int) -> str:
+    lang = "<http://publications.europa.eu/resource/authority/language/ENG>"
+    return (
+        "PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>\n"
+        "SELECT DISTINCT ?celex ?title WHERE {\n"
+        "  ?expr cdm:expression_belongs_to_work ?work .\n"
+        f"  ?expr cdm:expression_uses_language {lang} .\n"
+        "  ?expr cdm:expression_title ?title .\n"
+        "  ?work cdm:resource_legal_id_celex ?celex .\n"
+        # CELEX sector 3 = legislation; types R (regulation) / L (directive).
+        '  FILTER(regex(STR(?celex), "^3[0-9]{4}[RL]"))\n'
+        f'  FILTER(regex(STR(?title), "{term}", "i"))\n'
+        "}\n"
+        f"LIMIT {limit}"
+    )
+
+
+async def search_eu_legislation(clause_text: str, limit: int = 4) -> Dict[str, Any]:
+    """Retrieve real EU legislation relevant to a clause from the Publications
+    Office Cellar SPARQL endpoint (CELEX + title + EUR-Lex link).
+
+    No API key required, so this is a genuinely *live* signal even in demo mode.
+    Degrades gracefully to an ``error`` payload so the mesh keeps going.
+    """
+    term = _eu_keyword(clause_text)
+    query = _eu_sparql(term, limit)
+
+    try:
+        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
+            resp = await client.get(
+                _EU_CELLAR_ENDPOINT,
+                params={"query": query},
+                headers={"Accept": "application/sparql-results+json"},
+            )
+            resp.raise_for_status()
+            bindings = resp.json().get("results", {}).get("bindings", [])
+
+        results: List[Dict[str, str]] = []
+        for b in bindings:
+            celex = b.get("celex", {}).get("value", "")
+            title = b.get("title", {}).get("value", "")
+            if not celex or not title:
+                continue
+            results.append(
+                {
+                    "celex": celex,
+                    "title": title,
+                    "url": (
+                        "https://eur-lex.europa.eu/legal-content/EN/TXT/"
+                        f"?uri=CELEX:{celex}"
+                    ),
+                }
+            )
+
+        logger.info(
+            "EU Cellar returned %d act(s) for subject=%r", len(results), term
+        )
+        return {"source": "eu_cellar", "query": term, "results": results}
+
+    except Exception as exc:  # noqa: BLE001 — defensive: degrade gracefully
+        logger.exception("EU Cellar legislation search failed")
+        return {"source": "eu_cellar", "query": term, "results": [], "error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
 # NVIDIA NIM — High-Security Risk Agent (local mock)
 # ---------------------------------------------------------------------------
 def _mock_nim_assessment(clause_text: str) -> Dict[str, Any]:

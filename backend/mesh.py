@@ -38,7 +38,12 @@ from config import (
     perplexity_is_live,
     vertex_is_live,
 )
-from tools import assess_local_risk, query_precedents, research_clause
+from tools import (
+    assess_local_risk,
+    query_precedents,
+    research_clause,
+    search_eu_legislation,
+)
 
 logger = logging.getLogger("signoff.mesh")
 
@@ -101,9 +106,26 @@ async def _run_tool(
 # Evidence construction (from real tool outputs)
 # ---------------------------------------------------------------------------
 def _build_evidence(
-    graph: Dict[str, Any], web: Dict[str, Any], demo: bool, clause_type: str
+    graph: Dict[str, Any],
+    web: Dict[str, Any],
+    eu: Dict[str, Any],
+    demo: bool,
+    clause_type: str,
 ) -> List[Dict[str, Any]]:
     evidence: List[Dict[str, Any]] = []
+
+    # Real EU legislation first — it's authoritative and genuinely live.
+    for r in eu.get("results", []) or []:
+        evidence.append(
+            {
+                "kind": "regulation",
+                "title": (r.get("title") or "EU legislation")[:140],
+                "source": f"EU Cellar · CELEX {r.get('celex', '')}",
+                "detail": "Authoritative EU act retrieved live from the Publications "
+                "Office (Cellar SPARQL).",
+                "url": r.get("url", ""),
+            }
+        )
 
     for p in graph.get("precedents", []) or []:
         title = p.get("clause_type") or p.get("clause_id") or "Precedent clause"
@@ -171,11 +193,14 @@ def _demo_synthesis(
     nim: Dict[str, Any],
     graph: Dict[str, Any],
     web: Dict[str, Any],
+    eu: Dict[str, Any],
 ) -> Dict[str, Any]:
     severity = nim.get("severity", "MEDIUM")
     flagged: List[str] = nim.get("flagged_terms", []) or []
     tier = _severity_to_tier(severity)
     precedent_count = len(graph.get("precedents", []) or [])
+    eu_acts = eu.get("results", []) or []
+    eu_count = len(eu_acts)
 
     triggers: List[str] = []
     for term in flagged:
@@ -193,7 +218,12 @@ def _demo_synthesis(
             "- Negotiate explicit caps and carve-outs where exposure is open-ended."
             if tier >= 2
             else "- Standard terms; proceed and record in the audit log.",
-            "Research: aligned with prevailing market practice for this clause type.",
+            f"Research: grounded against {eu_count} live EU act(s) (Publications Office) "
+            + (
+                f"incl. {eu_acts[0].get('celex')}."
+                if eu_acts
+                else "for regulatory context."
+            ),
         ]
     )
 
@@ -212,19 +242,23 @@ def _demo_synthesis(
         },
         {
             "agent": "Precedent Agent",
-            "model": "Vertex AI",
-            "summary": f"{precedent_count} precedent(s) retrieved from the graph.",
-            "mode": "live" if neo4j_is_live() else "demo",
+            "model": "Vertex AI · EU Cellar",
+            "summary": (
+                f"{precedent_count} precedent(s) + {eu_count} EU act(s) grounded."
+            ),
+            "mode": "live" if (neo4j_is_live() or eu_count) else "demo",
             "findings": [
-                f"{precedent_count} comparable precedent(s) in the citation graph."
-            ],
-            "stance": "grounded" if precedent_count else "sparse-precedent",
+                f"{precedent_count} comparable precedent(s) in the citation graph.",
+                f"{eu_count} authoritative EU act(s) via the Publications Office.",
+            ]
+            + [f"{a.get('celex')} — {a.get('title', '')[:80]}" for a in eu_acts[:2]],
+            "stance": "grounded" if (precedent_count or eu_count) else "sparse-precedent",
             "phase": "initial",
             "assumptions": ["Graph reflects the firm's curated precedent corpus."],
             "red_flags": [],
             "reasoning": (
-                "Matched precedent clauses and their citation chains to ground the "
-                "risk posture in prior outcomes."
+                "Matched precedent clauses and live EU legislation (Cellar SPARQL) to "
+                "ground the risk posture in prior outcomes and binding regulation."
             ),
         },
         {
@@ -270,10 +304,12 @@ def _demo_synthesis(
 # ---------------------------------------------------------------------------
 _SYNTH_SYSTEM = """\
 You are the SignOff synthesizer for an asymmetric legal-risk multi-agent mesh.
-You receive three independent signals about one contract clause:
+You receive independent signals about one contract clause:
   1. NIM_LOCAL_ASSESSMENT — on-prem high-security severity + flagged terms.
   2. GRAPH_PRECEDENTS     — precedent clauses + citations from a graph DB.
-  3. WEB_RESEARCH         — live external legal research with citations.
+  3. EU_LEGISLATION       — authoritative EU acts (CELEX) retrieved live from the
+                           Publications Office; cite these where they bind.
+  4. WEB_RESEARCH         — live external legal research with citations.
 
 Weigh the signals, resolve conflicts conservatively (favor higher risk), and
 assign exactly one tier using THIS convention:
@@ -318,6 +354,7 @@ async def _gemini_synthesis(
     nim: Dict[str, Any],
     graph: Dict[str, Any],
     web: Dict[str, Any],
+    eu: Dict[str, Any],
 ) -> Dict[str, Any]:
     from vertexai.generative_models import GenerationConfig
 
@@ -327,6 +364,7 @@ async def _gemini_synthesis(
         f"CLAUSE UNDER REVIEW:\n{clause_text}\n\n"
         f"=== NIM_LOCAL_ASSESSMENT ===\n{json.dumps(nim, ensure_ascii=False)}\n\n"
         f"=== GRAPH_PRECEDENTS ===\n{json.dumps(graph, ensure_ascii=False)}\n\n"
+        f"=== EU_LEGISLATION (live, authoritative) ===\n{json.dumps(eu, ensure_ascii=False)}\n\n"
         f"=== WEB_RESEARCH ===\n{json.dumps(web, ensure_ascii=False)}\n\n"
         "Produce the risk JSON now."
     )
@@ -368,7 +406,12 @@ async def run_mesh(
     logger.info("Mesh run start (session=%s, jurisdiction=%s)", session_id, jurisdiction)
 
     # --- Parallel asymmetric fan-out -------------------------------------
-    (nim, nim_trace), (graph, graph_trace), (web, web_trace) = await asyncio.gather(
+    (
+        (nim, nim_trace),
+        (graph, graph_trace),
+        (eu, eu_trace),
+        (web, web_trace),
+    ) = await asyncio.gather(
         _run_tool(
             session_id,
             "Risk Agent",
@@ -388,13 +431,21 @@ async def run_mesh(
         _run_tool(
             session_id,
             "Precedent Agent",
+            "query_eu_cellar_api",
+            "live",  # public EU Publications Office — no key, genuinely live
+            search_eu_legislation(clause_text),
+            "Live EU legislation grounding via the Publications Office (Cellar).",
+        ),
+        _run_tool(
+            session_id,
+            "Precedent Agent",
             "query_perplexity_research",
             "live" if perplexity_is_live() else "demo",
             research_clause(clause_text, jurisdiction),
             "Live web-grounded legal research.",
         ),
     )
-    traces.extend([nim_trace, graph_trace, web_trace])
+    traces.extend([nim_trace, graph_trace, eu_trace, web_trace])
 
     # --- Synthesis (Gemini live, deterministic demo otherwise) -----------
     synth_started = _now()
@@ -403,15 +454,15 @@ async def run_mesh(
     if vertex_is_live():
         try:
             synthesized = await _gemini_synthesis(
-                clause_text, jurisdiction, nim, graph, web
+                clause_text, jurisdiction, nim, graph, web, eu
             )
         except Exception as exc:  # noqa: BLE001 — fall back to demo synthesis
             logger.exception("Gemini synthesis failed; using demo fallback")
             synth_status = "failed"
-            synthesized = _demo_synthesis(clause_text, nim, graph, web)
+            synthesized = _demo_synthesis(clause_text, nim, graph, web, eu)
             synthesized["agents"][-1]["red_flags"].append(f"Gemini error: {exc}")
     else:
-        synthesized = _demo_synthesis(clause_text, nim, graph, web)
+        synthesized = _demo_synthesis(clause_text, nim, graph, web, eu)
 
     traces.append(
         {
@@ -429,7 +480,7 @@ async def run_mesh(
     )
 
     demo = not vertex_is_live() or synth_status == "failed"
-    evidence = _build_evidence(graph, web, demo, effective_type)
+    evidence = _build_evidence(graph, web, eu, demo, effective_type)
 
     return {
         "session_id": session_id,
