@@ -41,20 +41,24 @@ import {
   X,
 } from "lucide-react";
 import {
+  getAudit,
   getHealth,
   getMatters,
   newSessionId,
   sendChat,
+  serviceForTool,
   signOff,
+  type AuditRecord,
   type BackendAgentResult,
+  type BackendTrace,
   type Classification,
   type EvidenceItem,
   type HealthResponse,
   type Matter,
   type Posture,
-  type SignOffRecord,
 } from "@/lib/api";
 import { LifecycleStepper } from "@/components/Lifecycle";
+import { Brand } from "@/components/Brand";
 
 export const Route = createFileRoute("/matter/$matterId")({
   head: () => ({
@@ -601,8 +605,8 @@ type Analysis = {
   classification: Classification;
   agents: BackendAgentResult[];
   evidence: EvidenceItem[];
+  traces: BackendTrace[];
 };
-type AuditEntry = { rec: SignOffRecord; ref: string; title: string };
 
 function SignOff() {
   const { matterId } = Route.useParams();
@@ -617,7 +621,9 @@ function SignOff() {
   const [modalOpen, setModalOpen] = useState(false);
   const [rationale, setRationale] = useState("");
   const [signing, setSigning] = useState(false);
-  const [audit, setAudit] = useState<AuditEntry[]>([]);
+  const [audit, setAudit] = useState<AuditRecord[]>([]);
+  const [auditVerified, setAuditVerified] = useState<boolean | null>(null);
+  const [showProvenance, setShowProvenance] = useState(false);
   const [input, setInput] = useState("");
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [view, setView] = useState<"document" | "playbook">("document");
@@ -646,6 +652,22 @@ function SignOff() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function loadAudit() {
+    try {
+      const r = await getAudit(matterId);
+      setAudit(r.events.filter((e) => e.type === "signoff"));
+      setAuditVerified(r.verified);
+    } catch {
+      setAudit([]);
+      setAuditVerified(null);
+    }
+  }
+
+  useEffect(() => {
+    void loadAudit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matterId]);
+
   async function runAnalysis(c: Clause, message: string) {
     const sessionId = newSessionId();
     sessionRef.current = sessionId;
@@ -654,7 +676,12 @@ function SignOff() {
       const res = await sendChat(message, sessionId);
       setAnalyses((prev) => ({
         ...prev,
-        [c.id]: { classification: res.classification, agents: res.agents, evidence: res.evidence },
+        [c.id]: {
+          classification: res.classification,
+          agents: res.agents,
+          evidence: res.evidence,
+          traces: res.traces,
+        },
       }));
       setPosture(res.classification.recommended_posture);
     } catch {
@@ -708,13 +735,16 @@ function SignOff() {
     if (!posture || !rationale.trim() || signing || !selected) return;
     setSigning(true);
     try {
-      const rec = await signOff({
+      await signOff({
         session_id: sessionRef.current || "session-demo",
         posture,
         rationale: rationale.trim(),
         tier: analysis?.classification.tier ?? 0,
+        matter_id: matterId,
+        clause_ref: selected.ref,
+        clause_title: selected.title,
       });
-      setAudit((prev) => [{ rec, ref: selected.ref, title: selected.title }, ...prev]);
+      await loadAudit();
       setRationale("");
       setModalOpen(false);
     } catch {
@@ -750,11 +780,8 @@ function SignOff() {
             <span className="text-[11px] font-medium">Coordinate</span>
           </Link>
           <span className="h-4 w-px bg-border" />
-          <Link to="/" className="flex items-center gap-2.5">
-            <span className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-background">
-              <FileSignature className="h-4 w-4" />
-            </span>
-            <span className="text-sm font-bold tracking-tight">SignOff</span>
+          <Link to="/">
+            <Brand />
           </Link>
           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="truncate text-sm font-medium">{deal.name}</span>
@@ -993,7 +1020,7 @@ function SignOff() {
                         );
                       })}
                       <span className="mx-0.5 h-5 w-px bg-border" />
-                      {audit.some((a) => a.ref === c.ref) ? (
+                      {audit.some((a) => a.data?.clause_ref === c.ref) ? (
                         <span className="inline-flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-[color:var(--color-success)]">
                           <CheckCircle2 className="h-3.5 w-3.5" /> Signed
                         </span>
@@ -1046,21 +1073,48 @@ function SignOff() {
               <div className="flex-1 overflow-y-auto scrollbar-thin px-5 py-5 space-y-4">
                 {showAudit && (
                   <div className="rounded-lg border border-white/[0.06] bg-card/50 p-4">
-                    <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Audit trail</h3>
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Audit trail</h3>
+                      {auditVerified !== null && (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                          style={{
+                            color: auditVerified ? "var(--color-success)" : "var(--color-warning)",
+                            backgroundColor: `color-mix(in oklab, ${auditVerified ? "var(--color-success)" : "var(--color-warning)"} 14%, transparent)`,
+                          }}
+                          title="Each record embeds the SHA-256 hash of the previous one. The server recomputes the chain on every read."
+                        >
+                          <Lock className="h-2.5 w-2.5" />
+                          {auditVerified ? "Hash chain verified" : "Chain integrity broken"}
+                        </span>
+                      )}
+                    </div>
+                    <Link
+                      to="/audit"
+                      className="mb-2 inline-flex items-center gap-1 text-[11px] text-[color:var(--color-info)] hover:underline"
+                    >
+                      View full portfolio trail <ArrowUpRight className="h-3 w-3" />
+                    </Link>
                     {audit.length === 0 ? (
-                      <p className="text-[12px] text-muted-foreground">No decisions signed yet.</p>
+                      <p className="text-[12px] text-muted-foreground">No decisions signed yet for this matter.</p>
                     ) : (
                       <ul className="space-y-2">
                         {audit.map((a) => (
-                          <li key={a.rec.id} className="rounded-md border border-border/70 bg-surface/40 px-2.5 py-2">
+                          <li key={a.id} className="rounded-md border border-border/70 bg-surface/40 px-2.5 py-2">
                             <div className="flex items-center justify-between gap-2">
                               <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold capitalize text-foreground">
                                 <CheckCircle2 className="h-3.5 w-3.5 text-[color:var(--color-success)]" />
-                                {a.rec.posture} · {a.ref}
+                                {String(a.data?.posture ?? "")} · {String(a.data?.clause_ref ?? "")}
                               </span>
-                              <span className="font-mono text-[10px] text-muted-foreground">#{a.rec.id.slice(0, 8)}</span>
+                              <span className="font-mono text-[10px] text-muted-foreground" title={`hash ${a.hash}`}>
+                                #{a.seq} · {a.hash.slice(0, 8)}
+                              </span>
                             </div>
-                            <p className="mt-1 text-[12px] text-muted-foreground">{a.rec.rationale}</p>
+                            <p className="mt-1 text-[12px] text-muted-foreground">{String(a.data?.rationale ?? "")}</p>
+                            <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-muted-foreground/80">
+                              <span>{a.actor}</span>
+                              <span className="font-mono">{new Date(a.timestamp).toLocaleString()}</span>
+                            </div>
                           </li>
                         ))}
                       </ul>
@@ -1157,6 +1211,70 @@ function SignOff() {
                         </ul>
                       )}
                     </div>
+
+                    {/* Provenance — which tools ran, live vs demo, latency, status */}
+                    {analysis.traces.length > 0 && (
+                      <div>
+                        <button
+                          onClick={() => setShowProvenance((v) => !v)}
+                          className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                        >
+                          <Lock className="h-3.5 w-3.5" />
+                          {showProvenance ? "Hide" : "View"} provenance
+                          <span className="font-mono opacity-70">{analysis.traces.length}</span>
+                          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showProvenance ? "" : "-rotate-90"}`} />
+                        </button>
+                        {showProvenance && (
+                          <ul className="mt-2 space-y-1.5">
+                            {analysis.traces.map((t) => {
+                              const live = t.mode === "live";
+                              const ms =
+                                t.finished_at && t.started_at
+                                  ? new Date(t.finished_at).getTime() - new Date(t.started_at).getTime()
+                                  : undefined;
+                              return (
+                                <li
+                                  key={t.id}
+                                  className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-surface/40 px-3 py-2"
+                                >
+                                  <span
+                                    className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider"
+                                    style={{
+                                      color: live ? "var(--color-success)" : "var(--color-muted-foreground)",
+                                      backgroundColor: live
+                                        ? "color-mix(in oklab, var(--color-success) 14%, transparent)"
+                                        : "var(--color-muted)",
+                                    }}
+                                  >
+                                    {live ? "Live" : "Demo"}
+                                  </span>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-[12px] font-medium text-foreground">
+                                      {serviceForTool(t.tool)}
+                                    </p>
+                                    <p className="truncate text-[10px] text-muted-foreground">{t.detail}</p>
+                                  </div>
+                                  {ms !== undefined && (
+                                    <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{ms}ms</span>
+                                  )}
+                                  <span
+                                    className="shrink-0 text-[10px] font-medium"
+                                    style={{
+                                      color:
+                                        t.status === "failed"
+                                          ? "var(--color-warning)"
+                                          : "var(--color-muted-foreground)",
+                                    }}
+                                  >
+                                    {t.status}
+                                  </span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </div>
+                    )}
 
                     {/* Demoted telemetry */}
                     <div>

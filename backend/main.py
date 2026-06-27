@@ -33,6 +33,7 @@ from config import (
     get_settings,
     integration_status,
 )
+import audit
 from matters import create_matter, get_matter, list_matters, list_tasks
 from mesh import run_mesh
 
@@ -182,6 +183,10 @@ class SignOffRequest(BaseModel):
     rationale: str = Field(..., min_length=1)
     tier: int
     author: str = "Lead Counsel"
+    # Snapshot context so the audit record proves WHAT was decided on.
+    matter_id: Optional[str] = None
+    clause_ref: Optional[str] = None
+    clause_title: Optional[str] = None
 
 
 class SignOffRecord(BaseModel):
@@ -192,6 +197,33 @@ class SignOffRecord(BaseModel):
     tier: int
     author: str
     signed_at: str
+
+
+class AuditRecord(BaseModel):
+    seq: int
+    id: str
+    type: str
+    matter_id: Optional[str] = None
+    session_id: Optional[str] = None
+    actor: str
+    summary: str
+    data: Dict[str, Any]
+    timestamp: str
+    prev_hash: str
+    hash: str
+
+
+class AuditResponse(BaseModel):
+    events: List[AuditRecord]
+    count: int
+    verified: bool
+    stats: Dict[str, Any]
+
+
+class VerifyResponse(BaseModel):
+    ok: bool
+    count: int
+    broken_at: Optional[int] = None
 
 
 class AnalyzeClauseRequest(BaseModel):
@@ -236,21 +268,43 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------------------------
-# Audit trail (Firestore)
+# Audit trail — local hash chain (always) + Firestore mirror (when live)
 # ---------------------------------------------------------------------------
-async def _write_audit_log(entry: Dict[str, Any]) -> None:
-    """Persist an audit record to Firestore. Never raises into the request."""
+async def _mirror_to_firestore(entry: Dict[str, Any]) -> None:
+    """Best-effort durable mirror of an audit record. Never raises."""
     if not firestore_is_live():
-        logger.info("Firestore in demo mode; skipping audit write (id=%s)", entry.get("id"))
         return
     try:
         client = get_firestore_client()
         collection = get_settings().firestore_audit_collection
-        doc_id = entry.get("id") or entry.get("request_id") or str(uuid.uuid4())
+        doc_id = entry.get("id") or str(uuid.uuid4())
         await client.collection(collection).document(doc_id).set(entry)
-        logger.info("Audit log written (id=%s)", doc_id)
+        logger.info("Audit log mirrored to Firestore (id=%s)", doc_id)
     except Exception:  # noqa: BLE001 — auditing must not break the response
-        logger.exception("Failed to write audit log (id=%s)", entry.get("id"))
+        logger.exception("Failed to mirror audit log (id=%s)", entry.get("id"))
+
+
+async def _audit(
+    event_type: str,
+    *,
+    matter_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+    actor: str = "system",
+    summary: str = "",
+    data: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Append a tamper-evident record to the local hash chain, then mirror it to
+    Firestore when configured. The local chain is always the source of truth."""
+    record = audit.record_event(
+        event_type,
+        matter_id=matter_id,
+        session_id=session_id,
+        actor=actor,
+        summary=summary,
+        data=data,
+    )
+    await _mirror_to_firestore(record)
+    return record
 
 
 # ---------------------------------------------------------------------------
@@ -262,7 +316,14 @@ async def root() -> Dict[str, Any]:
         "service": "SignOff Asymmetric Legal Risk Mesh",
         "status": "ok",
         "model": get_settings().vertex_model,
-        "endpoints": ["/api/health", "/api/chat", "/api/signoff"],
+        "endpoints": [
+            "/api/health",
+            "/api/matters",
+            "/api/chat",
+            "/api/signoff",
+            "/api/audit",
+            "/api/audit/verify",
+        ],
     }
 
 
@@ -270,6 +331,25 @@ async def root() -> Dict[str, Any]:
 async def health() -> HealthResponse:
     integrations = integration_status()
     return HealthResponse(status="ok", integrations=integrations)
+
+
+@app.get("/api/audit", response_model=AuditResponse)
+async def get_audit(matter_id: Optional[str] = None, limit: int = 200) -> AuditResponse:
+    """Read back the tamper-evident audit trail (optionally scoped to a matter)."""
+    events = audit.list_events(matter_id=matter_id, limit=limit)
+    verification = audit.verify_chain()
+    return AuditResponse(
+        events=[AuditRecord(**e) for e in events],
+        count=verification["count"],
+        verified=verification["ok"],
+        stats=audit.stats(),
+    )
+
+
+@app.get("/api/audit/verify", response_model=VerifyResponse)
+async def verify_audit() -> VerifyResponse:
+    """Recompute the hash chain and prove whether the trail is intact."""
+    return VerifyResponse(**audit.verify_chain())
 
 
 @app.get("/api/matters", response_model=MattersResponse)
@@ -282,7 +362,21 @@ async def matters() -> MattersResponse:
 async def new_matter(payload: MatterCreate) -> Matter:
     """Plan stage — register a supervised matter, define its envelope, deploy agents."""
     created = create_matter(payload.model_dump())
-    await _write_audit_log({"type": "matter_planned", **created})
+    await _audit(
+        "matter_planned",
+        matter_id=created["id"],
+        actor="system",
+        summary=f"Matter planned: {created['name']} ({created['asset_class']})",
+        data={
+            "name": created["name"],
+            "asset_class": created["asset_class"],
+            "deal_size": created["deal_size"],
+            "agents_deployed": created["agents_deployed"],
+            "compliance_envelope": created["compliance_envelope"],
+            "jurisdiction": created.get("jurisdiction"),
+            "redlines": created.get("redlines", []),
+        },
+    )
     return Matter(**{k: created[k] for k in Matter.model_fields})
 
 
@@ -311,16 +405,25 @@ async def chat(payload: ChatRequest) -> ChatResponse:
             detail="Internal error while analyzing the clause.",
         ) from exc
 
-    await _write_audit_log(
-        {
-            "id": str(uuid.uuid4()),
-            "type": "analysis",
-            "session_id": payload.session_id,
+    cls = result["classification"]
+    live_tools = [t["tool"] for t in result.get("traces", []) if t.get("mode") == "live"]
+    await _audit(
+        "analysis",
+        session_id=payload.session_id,
+        actor="mesh",
+        summary=(
+            f"Clause analyzed → Tier {cls['tier']} ({cls['tier_label']}), "
+            f"posture {cls['recommended_posture']}"
+        ),
+        data={
+            "tier": cls["tier"],
+            "recommended_posture": cls["recommended_posture"],
+            "confidence": cls.get("confidence"),
             "jurisdiction": payload.jurisdiction,
-            "tier": result["classification"]["tier"],
-            "recommended_posture": result["classification"]["recommended_posture"],
-            "created_at": result["created_at"],
-        }
+            "clause_type": payload.clause_type,
+            "evidence_count": len(result.get("evidence", [])),
+            "live_tools": live_tools,
+        },
     )
 
     return ChatResponse(**result)
@@ -339,7 +442,25 @@ async def signoff(payload: SignOffRequest) -> SignOffRecord:
         signed_at=datetime.now(timezone.utc).isoformat(),
     )
 
-    await _write_audit_log({"type": "signoff", **record.model_dump()})
+    clause_label = payload.clause_ref or payload.clause_title or "clause"
+    await _audit(
+        "signoff",
+        matter_id=payload.matter_id,
+        session_id=payload.session_id,
+        actor=payload.author,
+        summary=(
+            f"{payload.author} signed off {clause_label} → "
+            f"{payload.posture.upper()} (Tier {payload.tier})"
+        ),
+        data={
+            "posture": payload.posture,
+            "tier": payload.tier,
+            "rationale": payload.rationale,
+            "clause_ref": payload.clause_ref,
+            "clause_title": payload.clause_title,
+            "signoff_id": record.id,
+        },
+    )
     return record
 
 
@@ -361,16 +482,22 @@ async def analyze_clause_endpoint(payload: AnalyzeClauseRequest) -> ChatResponse
             detail="Internal error while analyzing the clause.",
         ) from exc
 
-    await _write_audit_log(
-        {
-            "id": str(uuid.uuid4()),
-            "type": "analysis",
-            "session_id": session_id,
-            "deal_id": payload.deal_id,
+    cls = result["classification"]
+    await _audit(
+        "analysis",
+        matter_id=payload.deal_id,
+        session_id=session_id,
+        actor="mesh",
+        summary=(
+            f"Clause analyzed → Tier {cls['tier']} ({cls['tier_label']}), "
+            f"posture {cls['recommended_posture']}"
+        ),
+        data={
+            "tier": cls["tier"],
+            "recommended_posture": cls["recommended_posture"],
             "jurisdiction": payload.jurisdiction,
-            "tier": result["classification"]["tier"],
-            "created_at": result["created_at"],
-        }
+            "evidence_count": len(result.get("evidence", [])),
+        },
     )
     return ChatResponse(**result)
 

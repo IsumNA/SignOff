@@ -5,7 +5,6 @@ import {
   ArrowUpRight,
   ChevronRight,
   Cpu,
-  FileSignature,
   Gauge,
   Loader2,
   ScanSearch,
@@ -19,6 +18,7 @@ import {
   type TasksResponse,
 } from "@/lib/api";
 import { LifecycleStepper } from "@/components/Lifecycle";
+import { Brand } from "@/components/Brand";
 
 export const Route = createFileRoute("/coordinate/$matterId")({
   head: () => ({
@@ -108,14 +108,11 @@ function Coordinate() {
       {/* Topbar */}
       <header className="flex items-center justify-between gap-4 border-b border-border bg-surface/60 px-6 py-3">
         <div className="flex items-center gap-2.5 min-w-0">
-          <Link to="/" className="flex items-center gap-2.5">
-            <span className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-background">
-              <FileSignature className="h-4 w-4" />
-            </span>
-            <span className="text-sm font-bold tracking-tight">SignOff</span>
+          <Link to="/">
+            <Brand />
           </Link>
           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="truncate text-sm font-medium">{name}</span>
+          <span className="truncate text-[13px] font-medium">{name}</span>
           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="truncate text-sm font-medium text-muted-foreground">Coordinate</span>
         </div>

@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   ArrowUpRight,
   CheckCircle2,
-  ChevronRight,
   Cpu,
   FileSignature,
   Gauge,
@@ -25,15 +24,16 @@ import {
   type MatterStage,
   type MatterStatus,
 } from "@/lib/api";
+import { Brand } from "@/components/Brand";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "SignOff — Oversight Control Tower" },
+      { title: "SignOff — Supervision" },
       {
         name: "description",
         content:
-          "Supervise dozens of automated legal workstreams across every active matter from one command center.",
+          "Supervise every active matter in one place: plan, coordinate, review and sign off.",
       },
     ],
   }),
@@ -254,17 +254,20 @@ function Ledger() {
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
       {/* ── Topbar ── */}
       <header className="flex items-center justify-between gap-4 border-b border-border bg-surface/60 px-6 py-3">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-background">
-            <FileSignature className="h-4 w-4" />
-          </span>
-          <span className="text-sm font-bold tracking-tight">SignOff</span>
-          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="truncate text-sm font-medium text-muted-foreground">
-            Oversight Control Tower
+        <div className="flex items-center gap-3 min-w-0">
+          <Brand />
+          <span className="h-4 w-px bg-border" />
+          <span className="truncate text-[13px] font-medium text-muted-foreground">
+            Supervision
           </span>
         </div>
         <div className="flex items-center gap-4">
+          <Link
+            to="/audit"
+            className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground transition hover:text-foreground"
+          >
+            <ShieldCheck className="h-3.5 w-3.5" /> Audit trail
+          </Link>
           <Link
             to="/plan"
             className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-1.5 text-[12px] font-semibold text-background transition hover:opacity-90"
@@ -295,10 +298,10 @@ function Ledger() {
         <div className="mx-auto max-w-6xl px-6 py-8">
           {/* Title */}
           <div className="mb-6">
-            <h1 className="text-xl font-bold tracking-tight">Portfolio Risk Ledger</h1>
+            <h1 className="text-[22px] font-semibold tracking-[-0.01em]">Matters</h1>
             <p className="mt-1 text-[13px] text-muted-foreground">
-              Every active matter, the autonomous agents deployed on it, and the blockers awaiting
-              your sign-off — one supervised risk envelope across the entire fleet.
+              Every matter you supervise, the stage it has reached, and what is waiting on
+              your review and sign-off.
             </p>
           </div>
 

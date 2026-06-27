@@ -5,7 +5,6 @@ import {
   Check,
   ChevronRight,
   Cpu,
-  FileSignature,
   Gauge,
   Loader2,
   Plus,
@@ -15,6 +14,7 @@ import {
 } from "lucide-react";
 import { createMatter } from "@/lib/api";
 import { LifecycleStepper } from "@/components/Lifecycle";
+import { Brand } from "@/components/Brand";
 
 export const Route = createFileRoute("/plan")({
   head: () => ({
@@ -166,14 +166,11 @@ function PlanMatter() {
       {/* Topbar */}
       <header className="flex items-center justify-between gap-4 border-b border-border bg-surface/60 px-6 py-3">
         <div className="flex items-center gap-2.5 min-w-0">
-          <Link to="/" className="flex items-center gap-2.5 min-w-0">
-            <span className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-background">
-              <FileSignature className="h-4 w-4" />
-            </span>
-            <span className="text-sm font-bold tracking-tight">SignOff</span>
+          <Link to="/" className="min-w-0">
+            <Brand />
           </Link>
           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="truncate text-sm font-medium text-muted-foreground">Plan a Matter</span>
+          <span className="truncate text-[13px] font-medium text-muted-foreground">Plan a matter</span>
         </div>
         <LifecycleStepper current="plan" compact />
       </header>

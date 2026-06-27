@@ -5,6 +5,9 @@
 service-account*.json
 gcp-credentials*.json
 
+# Runtime data (local audit hash chain)
+audit_log.jsonl
+
 # Python
 __pycache__/
 *.py[cod]

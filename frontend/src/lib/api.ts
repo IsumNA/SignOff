@@ -78,6 +78,9 @@ export async function signOff(input: {
   rationale: string;
   tier: number;
   author?: string;
+  matter_id?: string;
+  clause_ref?: string;
+  clause_title?: string;
 }): Promise<SignOffRecord> {
   const res = await fetch(`${API_BASE}/api/signoff`, {
     method: "POST",
@@ -85,6 +88,48 @@ export async function signOff(input: {
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(`signoff ${res.status}`);
+  return res.json();
+}
+
+// ---- Tamper-evident audit trail ----
+
+export interface AuditRecord {
+  seq: number;
+  id: string;
+  type: "analysis" | "signoff" | "matter_planned" | string;
+  matter_id: string | null;
+  session_id: string | null;
+  actor: string;
+  summary: string;
+  data: Record<string, unknown>;
+  timestamp: string;
+  prev_hash: string;
+  hash: string;
+}
+
+export interface AuditResponse {
+  events: AuditRecord[];
+  count: number;
+  verified: boolean;
+  stats: { total: number; by_type: Record<string, number> };
+}
+
+export async function getAudit(matterId?: string, limit = 200): Promise<AuditResponse> {
+  const qs = new URLSearchParams();
+  if (matterId) qs.set("matter_id", matterId);
+  qs.set("limit", String(limit));
+  const res = await fetch(`${API_BASE}/api/audit?${qs.toString()}`);
+  if (!res.ok) throw new Error(`audit ${res.status}`);
+  return res.json();
+}
+
+export async function verifyAudit(): Promise<{
+  ok: boolean;
+  count: number;
+  broken_at: number | null;
+}> {
+  const res = await fetch(`${API_BASE}/api/audit/verify`);
+  if (!res.ok) throw new Error(`audit verify ${res.status}`);
   return res.json();
 }
 
