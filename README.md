@@ -12,6 +12,17 @@ tamper-proof record of every decision.
 
 Built with a Clifford Chance supervision workflow in mind.
 
+> **Solution in brief.** SignOff is a supervision layer that sits *above* the
+> legal-AI tools doing the drafting. A supervising lawyer plans a matter (with
+> risk limits and AI reviewers), coordinates the work on a board, reviews each
+> clause with a parallel multi-model risk verdict (NVIDIA Nemotron, a Neo4j
+> precedent graph, live EU legislation, and Perplexity research, fused by Gemini),
+> and signs off — while every decision streams to the screen live and is written
+> to a tamper-proof, hash-chained audit trail. A portfolio-learning layer then
+> turns the accumulated record into proactive planning suggestions. It runs fully
+> end-to-end with **no credentials** (demo mode) and flips each integration to
+> **live** when its key is present.
+
 ---
 
 ## Contents
@@ -25,6 +36,7 @@ Built with a Clifford Chance supervision workflow in mind.
 - [API reference](#api-reference)
 - [How it maps to the judging criteria](#how-it-maps-to-the-judging-criteria)
 - [Honest limitations](#honest-limitations)
+- [License](#license)
 
 ---
 
@@ -286,3 +298,11 @@ In keeping with the rigour the brief asks for:
   audit trail; it is a transparent heuristic, not a trained model.
 - "Live" vs "Demo" reflects exactly what is configured at runtime — see
   `/api/health`.
+
+---
+
+## License
+
+Released under the [MIT License](LICENSE) — free to fork, use and build on.
+Configuration secrets live in git-ignored `.env` files; `.env.example` is the
+only committed template and contains placeholders only.
