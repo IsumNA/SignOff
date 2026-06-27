@@ -3,28 +3,22 @@ import {
   useEffect,
   useRef,
   useState,
+  type ElementType,
   type FormEvent,
   type ReactNode,
 } from "react";
 import {
-  AlertOctagon,
-  AlertTriangle,
   ArrowLeft,
   ArrowUp,
   ArrowUpRight,
-  BookMarked,
-  Briefcase,
   Check,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   CircleDot,
-  FileSignature,
   FileText,
-  Gavel,
   GitBranch,
   Infinity,
-  Landmark,
   Link2,
   Loader2,
   Lock,
@@ -32,11 +26,7 @@ import {
   Paperclip,
   PenLine,
   Plus,
-  Scale,
   Settings,
-  ShieldAlert,
-  ShieldCheck,
-  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -45,6 +35,7 @@ import {
   getHealth,
   getMatters,
   newSessionId,
+  openTraceStream,
   sendChat,
   serviceForTool,
   signOff,
@@ -59,6 +50,15 @@ import {
 } from "@/lib/api";
 import { LifecycleStepper } from "@/components/Lifecycle";
 import { Brand } from "@/components/Brand";
+import {
+  DocumentFold,
+  Gavel,
+  Scales,
+  Seal,
+  SectionMark,
+  SignatureLine,
+  Statute,
+} from "@/components/icons";
 
 export const Route = createFileRoute("/matter/$matterId")({
   head: () => ({
@@ -75,12 +75,12 @@ export const Route = createFileRoute("/matter/$matterId")({
 // ---------------------------------------------------------------------------
 
 const DEAL_DEFAULTS = {
-  name: "Project Titan",
-  client: "Helios Energy Corp.",
-  counterparty: "Northwind Holdings",
-  value: "$2.4B",
-  draft: "Draft v18",
-  law: "English law",
+  name: "Project Pennine",
+  client: "CVC Capital Partners",
+  counterparty: "Recordati S.p.A.",
+  value: "€6.7bn",
+  draft: "Draft v9",
+  law: "English & Italian law",
 };
 
 const MATTER_STATUS_LABEL: Record<string, string> = {
@@ -104,56 +104,79 @@ type Clause = {
 
 const CLAUSES: Clause[] = [
   {
-    id: "c21",
-    ref: "§2.1",
-    title: "Purchase Price",
+    id: "c31",
+    ref: "§3.1",
+    title: "Consideration & Completion Accounts",
     severity: "clean",
-    text: "The aggregate consideration for the Shares shall be USD 2,400,000,000, payable in cash at Closing, subject to the adjustments set out in Schedule 3.",
+    text: "The aggregate consideration for the Shares shall be EUR 6,700,000,000, payable in cash at Completion, subject to the locked-box and leakage adjustments set out in Schedule 4 and the Completion Accounts mechanism in Schedule 5.",
   },
   {
-    id: "c41",
-    ref: "§4.1",
-    title: "Interim Operating Covenants",
+    id: "c52",
+    ref: "§5.2",
+    title: "Conduct of Business (Interim Covenants)",
     severity: "review",
-    risks: [{ phrase: "without the Buyer's prior written consent", kind: "high" }],
-    text: "Between signing and Closing, the Target shall conduct its business in the ordinary course and shall not, without the Buyer's prior written consent, incur capital expenditure exceeding USD 5,000,000 in aggregate.",
+    risks: [{ phrase: "without the Purchaser's prior written consent", kind: "high" }],
+    text: "Between Signing and Completion, the Group shall carry on its business in the ordinary course consistent with past practice and shall not, without the Purchaser's prior written consent, incur capital expenditure exceeding EUR 25,000,000 in aggregate or settle any litigation above EUR 5,000,000.",
   },
   {
-    id: "c73",
-    ref: "§7.3",
+    id: "c84",
+    ref: "§8.4",
     title: "Material Adverse Change",
     severity: "policy",
     risks: [{ phrase: "including industry-wide regulatory shifts", kind: "policy" }],
     redline: {
       before: "including industry-wide regulatory shifts",
-      after: "excluding industry-wide regulatory shifts unless they disproportionately affect the Target",
+      after: "excluding industry-wide regulatory shifts unless they disproportionately affect the Group",
     },
-    text: 'A "Material Adverse Change" means any event, change, or effect that is materially adverse to the business, operations, or financial condition of the Target, including industry-wide regulatory shifts, whether or not such effect disproportionately affects the Target relative to comparable industry participants.',
+    text: 'A "Material Adverse Change" means any event, change or effect that is materially adverse to the business, operations or financial condition of the Group, including industry-wide regulatory shifts, whether or not such effect disproportionately affects the Group relative to comparable industry participants.',
   },
   {
-    id: "c91",
-    ref: "§9.1",
-    title: "Seller Indemnification",
+    id: "c93",
+    ref: "§9.3",
+    title: "Data Protection & International Transfers",
+    severity: "review",
+    risks: [
+      { phrase: "transfer Personal Data outside the UK and EEA", kind: "policy" },
+      { phrase: "without implementing the applicable safeguards", kind: "high" },
+    ],
+    text: "The Group may transfer Personal Data outside the UK and EEA to affiliates and service providers without implementing the applicable safeguards under Chapter V of the UK GDPR, provided that such transfers are necessary for the integration of the business following Completion.",
+  },
+  {
+    id: "c111",
+    ref: "§11.1",
+    title: "Warranties, Limitations & Indemnities",
     severity: "policy",
     risks: [
-      { phrase: "uncapped basis", kind: "policy" },
-      { phrase: "all Losses", kind: "high" },
+      { phrase: "on an uncapped basis", kind: "policy" },
+      { phrase: "without time limit", kind: "high" },
     ],
-    text: "The Seller shall indemnify and hold harmless the Buyer against all Losses arising from any breach of the Seller's warranties, including pre-Closing Tax liabilities, on an uncapped basis and without any time limitation.",
+    text: "The Seller shall indemnify the Purchaser against all Losses arising from any breach of the Fundamental Warranties and any pre-Completion Tax Liability, on an uncapped basis and without time limit, notwithstanding the general liability cap of 20% of the consideration set out in Schedule 7.",
   },
   {
-    id: "c112",
-    ref: "§11.2",
-    title: "Confidentiality",
-    severity: "clean",
-    text: "Each party shall keep confidential all information disclosed by the other party in connection with this Agreement for a period of five (5) years following Closing.",
+    id: "c125",
+    ref: "§12.5",
+    title: "Sanctions, ABC & Export Controls",
+    severity: "review",
+    risks: [{ phrase: "to the best of the Seller's knowledge", kind: "high" }],
+    text: "To the best of the Seller's knowledge, no member of the Group nor any of its directors is a Restricted Party or has, in the five years prior to Signing, engaged in dealings with any person subject to EU, UK, or OFAC sanctions, or breached applicable anti-bribery and export control laws.",
   },
   {
-    id: "c134",
-    ref: "§13.4",
+    id: "c142",
+    ref: "§14.2",
+    title: "Conditions: Merger Control & FDI",
+    severity: "policy",
+    risks: [
+      { phrase: "reasonable endeavours", kind: "policy" },
+      { phrase: "no obligation to offer any remedies", kind: "high" },
+    ],
+    text: "Completion is conditional on clearance under the EU Merger Regulation and applicable foreign direct investment regimes. The Purchaser shall use reasonable endeavours to obtain such clearances but shall be under no obligation to offer any remedies, divestments or behavioural commitments to any competition or FDI authority.",
+  },
+  {
+    id: "c173",
+    ref: "§17.3",
     title: "Governing Law & Jurisdiction",
     severity: "clean",
-    text: "This Agreement and any dispute arising out of it shall be governed by English law and subject to the exclusive jurisdiction of the courts of England and Wales.",
+    text: "This Agreement and any non-contractual obligations arising out of it shall be governed by English law and subject to the exclusive jurisdiction of the courts of England and Wales, save for the Italian law transfer formalities set out in Schedule 9.",
   },
 ];
 
@@ -161,33 +184,35 @@ const CLAUSES: Clause[] = [
 // Shared bits
 // ---------------------------------------------------------------------------
 
+// Color restraint: only true escalations (Tier 3 / policy breaches / rejection)
+// carry red. Tier 1–2 and the agents are monochrome, separated by icon.
 const SEV_COLOR: Record<Severity, string | undefined> = {
   clean: undefined,
-  review: "var(--color-warning)",
+  review: "var(--color-foreground)",
   policy: "var(--color-destructive)",
 };
 
-const TIER_STYLE: Record<number, { color: string; Icon: typeof ShieldCheck; sub: string }> = {
-  1: { color: "var(--color-success)", Icon: ShieldCheck, sub: "Routine" },
-  2: { color: "var(--color-warning)", Icon: AlertTriangle, sub: "Material risk" },
-  3: { color: "var(--color-destructive)", Icon: AlertOctagon, sub: "Escalation required" },
+const TIER_STYLE: Record<number, { color: string; Icon: typeof Gavel; sub: string }> = {
+  1: { color: "var(--color-muted-foreground)", Icon: Seal, sub: "Routine" },
+  2: { color: "var(--color-foreground)", Icon: Scales, sub: "Material risk" },
+  3: { color: "var(--color-destructive)", Icon: Gavel, sub: "Escalation required" },
 };
 
-const AGENT_META: Record<string, { name: string; vendor: string; Icon: typeof ShieldAlert; color: string }> = {
-  risk: { name: "Risk Agent", vendor: "NVIDIA NIM", Icon: ShieldAlert, color: "var(--color-nvidia)" },
-  precedent: { name: "Precedent Agent", vendor: "Vertex AI", Icon: Scale, color: "var(--color-vertex)" },
-  deal: { name: "Deal Agent", vendor: "Gemini 1.5 Pro", Icon: Briefcase, color: "var(--color-deal)" },
+const AGENT_META: Record<string, { name: string; vendor: string; Icon: typeof Gavel; color: string }> = {
+  risk: { name: "Risk Agent", vendor: "NVIDIA NIM", Icon: Gavel, color: "var(--color-foreground)" },
+  precedent: { name: "Precedent Agent", vendor: "Vertex AI", Icon: Scales, color: "var(--color-foreground)" },
+  deal: { name: "Deal Agent", vendor: "Gemini 2.0 Flash", Icon: Seal, color: "var(--color-foreground)" },
 };
 
-const EVIDENCE_META: Record<EvidenceItem["kind"], { Icon: typeof BookMarked; label: string }> = {
-  precedent: { Icon: BookMarked, label: "Precedents" },
-  regulation: { Icon: Landmark, label: "Regulations" },
-  citation: { Icon: Link2, label: "Citations" },
+const EVIDENCE_META: Record<EvidenceItem["kind"], { Icon: typeof Gavel; label: string }> = {
+  precedent: { Icon: Scales, label: "Precedents" },
+  regulation: { Icon: Statute, label: "Regulations" },
+  citation: { Icon: SectionMark, label: "Citations" },
 };
 
 const POSTURES = [
-  { id: "approve", label: "Approve", Icon: Check, color: "var(--color-success)" },
-  { id: "amend", label: "Amend", Icon: Sparkles, color: "var(--color-info)" },
+  { id: "approve", label: "Approve", Icon: Check, color: "var(--color-foreground)" },
+  { id: "amend", label: "Amend", Icon: PenLine, color: "var(--color-muted-foreground)" },
   { id: "reject", label: "Reject", Icon: X, color: "var(--color-destructive)" },
 ] as const;
 
@@ -207,8 +232,8 @@ type Rule = { id: string; subject: string; operator: string; value: string; tier
 
 const PB_TIERS: { tier: PbTier; label: string; color: string }[] = [
   { tier: 3, label: "Critical", color: "var(--color-destructive)" },
-  { tier: 2, label: "Warning", color: "var(--color-warning)" },
-  { tier: 1, label: "Notice", color: "var(--color-info)" },
+  { tier: 2, label: "Warning", color: "var(--color-foreground)" },
+  { tier: 1, label: "Notice", color: "var(--color-muted-foreground)" },
 ];
 
 const PB_SUBJECTS = [
@@ -360,7 +385,7 @@ function Playbook({
       {/* Tab strip echoing the editor chrome */}
       <div className="flex items-stretch border-b border-border bg-surface text-[12px]">
         <div className="flex items-center gap-2 border-r border-border bg-background px-3 py-1.5 text-foreground">
-          <Settings className="h-3.5 w-3.5 text-[color:var(--color-info)]" />
+          <Settings className="h-3.5 w-3.5 text-muted-foreground" />
           <span>Playbook Settings</span>
         </div>
         <button onClick={onClose} className="flex items-center gap-1.5 px-3 py-1.5 text-muted-foreground hover:text-foreground">
@@ -458,7 +483,7 @@ function renderWithHighlights(text: string, risks?: Risk[]): ReactNode {
   return text.split(re).map((part, i) => {
     const kind = map.get(part);
     if (!kind) return <span key={i}>{part}</span>;
-    const color = kind === "policy" ? "var(--color-destructive)" : "var(--color-warning)";
+    const color = kind === "policy" ? "var(--color-destructive)" : "var(--color-foreground)";
     return (
       <mark
         key={i}
@@ -513,12 +538,12 @@ function splitTrigger(t: string): { title: string; detail?: string } {
   return { title: t.trim() };
 }
 
-function triggerVisual(t: string): { Icon: typeof ShieldAlert; color: string } {
+function triggerVisual(t: string): { Icon: typeof Gavel; color: string } {
   const s = t.toLowerCase();
   if (s.includes("contradiction") || s.includes("↔")) {
-    return { Icon: AlertTriangle, color: "var(--color-warning)" };
+    return { Icon: Scales, color: "var(--color-foreground)" };
   }
-  if (s.includes("precedent")) return { Icon: Scale, color: "var(--color-vertex)" };
+  if (s.includes("precedent")) return { Icon: Scales, color: "var(--color-foreground)" };
   if (
     s.includes("gdpr") ||
     s.includes("regulation") ||
@@ -526,12 +551,12 @@ function triggerVisual(t: string): { Icon: typeof ShieldAlert; color: string } {
     s.includes("directive") ||
     s.includes("art.")
   ) {
-    return { Icon: Landmark, color: "var(--color-info)" };
+    return { Icon: Statute, color: "var(--color-foreground)" };
   }
   if (s.includes("risk") || s.includes("exposure")) {
-    return { Icon: ShieldAlert, color: "var(--color-destructive)" };
+    return { Icon: Gavel, color: "var(--color-destructive)" };
   }
-  return { Icon: AlertOctagon, color: "var(--color-destructive)" };
+  return { Icon: Gavel, color: "var(--color-destructive)" };
 }
 
 function parseRecommendation(text: string): { actions: string[]; research: string; body: string } {
@@ -577,7 +602,7 @@ function Disclosure({
   children,
 }: {
   title: string;
-  icon: typeof ShieldAlert;
+  icon: ElementType;
   count?: number;
   tone?: string;
   defaultOpen?: boolean;
@@ -611,7 +636,7 @@ type Analysis = {
 function SignOff() {
   const { matterId } = Route.useParams();
   const [matters, setMatters] = useState<Matter[]>([]);
-  const [selectedId, setSelectedId] = useState<string>("c73");
+  const [selectedId, setSelectedId] = useState<string>("c84");
   const [analyses, setAnalyses] = useState<Record<string, Analysis>>({});
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [posture, setPosture] = useState<Posture | null>(null);
@@ -624,6 +649,7 @@ function SignOff() {
   const [audit, setAudit] = useState<AuditRecord[]>([]);
   const [auditVerified, setAuditVerified] = useState<boolean | null>(null);
   const [showProvenance, setShowProvenance] = useState(false);
+  const [liveTraces, setLiveTraces] = useState<BackendTrace[]>([]);
   const [input, setInput] = useState("");
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [view, setView] = useState<"document" | "playbook">("document");
@@ -637,7 +663,9 @@ function SignOff() {
     ...DEAL_DEFAULTS,
     name: currentMatter?.name ?? DEAL_DEFAULTS.name,
     value: currentMatter?.deal_size ?? DEAL_DEFAULTS.value,
-    client: currentMatter?.asset_class ?? DEAL_DEFAULTS.client,
+    client: currentMatter?.client ?? DEAL_DEFAULTS.client,
+    counterparty: currentMatter?.counterparty ?? DEAL_DEFAULTS.counterparty,
+    law: currentMatter?.jurisdiction ?? DEAL_DEFAULTS.law,
   };
 
   const selected = CLAUSES.find((c) => c.id === selectedId) ?? null;
@@ -647,7 +675,7 @@ function SignOff() {
   useEffect(() => {
     getHealth().then(setHealth).catch(() => setHealth(null));
     getMatters().then((r) => setMatters(r.matters)).catch(() => setMatters([]));
-    const mac = CLAUSES.find((c) => c.id === "c73");
+    const mac = CLAUSES.find((c) => c.id === "c84");
     if (mac) void runAnalysis(mac, mac.text);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -672,6 +700,21 @@ function SignOff() {
     const sessionId = newSessionId();
     sessionRef.current = sessionId;
     setLoadingId(c.id);
+    setLiveTraces([]);
+
+    // Open the live trace stream BEFORE kicking off the analysis so the partner
+    // watches each agent (NIM, Neo4j, Perplexity, EU Cellar, Gemini) light up
+    // and resolve in real time. Frames upsert by id (running → success/failed).
+    const stream = openTraceStream(sessionId, (t) => {
+      setLiveTraces((prev) => {
+        const idx = prev.findIndex((x) => x.id === t.id);
+        if (idx === -1) return [...prev, t];
+        const next = prev.slice();
+        next[idx] = t;
+        return next;
+      });
+    });
+
     try {
       const res = await sendChat(message, sessionId);
       setAnalyses((prev) => ({
@@ -687,6 +730,7 @@ function SignOff() {
     } catch {
       // leave un-analyzed; panel shows a retry hint
     } finally {
+      stream.close();
       setLoadingId(null);
     }
   }
@@ -740,6 +784,7 @@ function SignOff() {
         posture,
         rationale: rationale.trim(),
         tier: analysis?.classification.tier ?? 0,
+        author: "Rob Clay",
         matter_id: matterId,
         clause_ref: selected.ref,
         clause_title: selected.title,
@@ -784,7 +829,7 @@ function SignOff() {
             <Brand />
           </Link>
           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="truncate text-sm font-medium">{deal.name}</span>
+          <span className="truncate font-serif text-[15px] font-medium tracking-[-0.01em]">{deal.name}</span>
           <span className="hidden md:inline rounded-md border border-border bg-surface-elevated px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
             {deal.draft} · {deal.value}
           </span>
@@ -807,10 +852,10 @@ function SignOff() {
           {/* Profile + Playbook settings entry point */}
           <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2.5">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-foreground">LC</span>
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-foreground">RC</span>
               <span className="min-w-0">
-                <span className="block truncate text-[12px] font-semibold text-foreground">Northwind Legal</span>
-                <span className="block truncate text-[10px] text-muted-foreground">Lead Counsel</span>
+                <span className="block truncate text-[12px] font-semibold text-foreground">Clifford Chance</span>
+                <span className="block truncate text-[10px] text-muted-foreground">Rob Clay · Partner</span>
               </span>
             </div>
             <button
@@ -844,12 +889,12 @@ function SignOff() {
                     active ? "bg-card" : "hover:bg-card/50"
                   }`}
                 >
-                  <Briefcase className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${active ? "text-foreground" : "text-muted-foreground"}`} />
+                  <DocumentFold className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${active ? "text-foreground" : "text-muted-foreground"}`} />
                   <span className="min-w-0 flex-1">
                     <span className={`block truncate text-[12px] font-semibold ${active ? "text-foreground" : "text-muted-foreground"}`}>{m.name}</span>
                     <span className="block truncate text-[10px] text-muted-foreground">{m.asset_class} · {m.deal_size}</span>
                     <span className="mt-0.5 inline-flex items-center gap-1 text-[9px] uppercase tracking-wider text-muted-foreground">
-                      <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-[color:var(--color-warning)]" : "bg-muted-foreground/40"}`} />
+                      <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-foreground" : "bg-muted-foreground/40"}`} />
                       {MATTER_STATUS_LABEL[m.status] ?? m.status}
                     </span>
                   </span>
@@ -900,7 +945,7 @@ function SignOff() {
         <div className="flex w-3/5 min-w-0 flex-col">
           <div className="flex items-stretch border-b border-border bg-surface text-[12px]">
             <div className="flex items-center gap-2 border-r border-border bg-background px-3 py-1.5 text-foreground">
-              <FileText className="h-3.5 w-3.5 text-[color:var(--color-info)]" />
+              <FileText className="h-3.5 w-3.5 text-muted-foreground" />
               <span>SPA_{deal.name.replace(/\s+/g, "_")}.md</span>
               <span className="ml-1 h-1.5 w-1.5 rounded-full bg-muted-foreground/70" title="Unsaved changes" />
             </div>
@@ -914,9 +959,11 @@ function SignOff() {
           </div>
           <main className="min-h-0 flex-1 overflow-y-auto scrollbar-thin bg-background">
           <div className="mx-auto max-w-3xl px-8 py-8">
-            <div className="mb-6 border-b border-border pb-4">
-              <h1 className="text-lg font-bold tracking-tight">Share Purchase Agreement</h1>
-              <p className="mt-1 text-[12px] text-muted-foreground">
+            <div className="mb-8 border-b border-border pb-5">
+              <h1 className="font-serif text-[24px] font-medium leading-tight tracking-[-0.01em]">
+                Share Purchase Agreement
+              </h1>
+              <p className="mt-1.5 text-[12px] text-muted-foreground">
                 {deal.client} ⟶ {deal.counterparty} · Buy-side · {deal.draft}
               </p>
             </div>
@@ -929,29 +976,29 @@ function SignOff() {
                 <div
                   key={c.id}
                   onClick={() => selectClause(c)}
-                  className={`group relative cursor-pointer rounded-lg border pl-5 pr-4 transition-all duration-200 ${
+                  className={`group relative cursor-pointer rounded-lg border pl-6 pr-4 transition-all duration-200 ${
                     isSel
-                      ? "mb-3 border-border-strong bg-card py-4 opacity-100"
-                      : "mb-1 border-transparent py-2 opacity-65 hover:bg-card/50 hover:opacity-100"
+                      ? "mb-4 border-border-strong bg-card py-5 opacity-100"
+                      : "mb-1.5 border-transparent py-2.5 opacity-65 hover:bg-card/50 hover:opacity-100"
                   }`}
                 >
                   {sev && (
-                    <span className="absolute left-1.5 top-2.5 bottom-2.5 w-1 rounded-full" style={{ background: sev }} />
+                    <span className="absolute left-2 top-3 bottom-3 w-0.5 rounded-full" style={{ background: sev }} />
                   )}
-                  <div className={`flex items-center gap-2 ${isSel ? "mb-2.5" : ""}`}>
+                  <div className={`flex items-center gap-2.5 ${isSel ? "mb-3" : ""}`}>
                     <ChevronRight
                       className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${isSel ? "rotate-90" : ""}`}
                     />
                     <span className="font-mono text-[11px] text-muted-foreground">{c.ref}</span>
-                    <span className="text-[13px] font-semibold">{c.title}</span>
+                    <span className="font-serif text-[16px] font-medium tracking-[-0.01em]">{c.title}</span>
                     {c.severity === "policy" && (
                       <span className="inline-flex items-center gap-1 rounded-md border border-[color:var(--color-destructive)]/30 bg-[color:var(--color-destructive)]/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[color:var(--color-destructive)]">
-                        <AlertOctagon className="h-2.5 w-2.5" /> Policy
+                        <Gavel className="h-2.5 w-2.5" /> Policy
                       </span>
                     )}
                     {c.severity === "review" && (
-                      <span className="inline-flex items-center gap-1 rounded-md border border-[color:var(--color-warning)]/30 bg-[color:var(--color-warning)]/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[color:var(--color-warning)]">
-                        <AlertTriangle className="h-2.5 w-2.5" /> Review
+                      <span className="inline-flex items-center gap-1 rounded-md border border-border-strong px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                        <Scales className="h-2.5 w-2.5" /> Review
                       </span>
                     )}
                     {ca && (
@@ -968,7 +1015,7 @@ function SignOff() {
                   </div>
 
                   {isSel && (
-                    <p className="text-[14px] leading-relaxed text-foreground/90">
+                    <p className="text-[14px] leading-7 text-foreground/90 animate-reveal">
                       {renderWithHighlights(c.text, c.risks)}
                     </p>
                   )}
@@ -977,7 +1024,7 @@ function SignOff() {
                   {isSel && c.redline && posture === "amend" && (
                     <div className="mt-3 flex flex-col gap-2 rounded-lg border border-white/[0.06] bg-surface/60 p-4 text-[13px] leading-relaxed">
                       <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        <Sparkles className="h-3 w-3 text-[color:var(--color-info)]" /> Proposed redline
+                        <PenLine className="h-3 w-3 text-muted-foreground" /> Proposed redline
                       </div>
                       <div className="flex items-start gap-2.5 rounded-md bg-[color:var(--color-destructive)]/10 px-3 py-2">
                         <span className="mt-px font-mono font-semibold text-[color:var(--color-destructive)]">−</span>
@@ -985,8 +1032,8 @@ function SignOff() {
                           {c.redline.before}
                         </span>
                       </div>
-                      <div className="flex items-start gap-2.5 rounded-md bg-[color:var(--color-success)]/10 px-3 py-2">
-                        <span className="mt-px font-mono font-semibold text-[color:var(--color-success)]">+</span>
+                      <div className="flex items-start gap-2.5 rounded-md bg-foreground/[0.06] px-3 py-2">
+                        <span className="mt-px font-mono font-semibold text-foreground">+</span>
                         <span className="text-foreground">{c.redline.after}</span>
                       </div>
                     </div>
@@ -1014,14 +1061,14 @@ function SignOff() {
                             <p.Icon className="h-3.5 w-3.5" />
                             {p.label}
                             {rec && (
-                              <span className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-[color:var(--color-info)]" />
+                              <span className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-foreground" />
                             )}
                           </button>
                         );
                       })}
                       <span className="mx-0.5 h-5 w-px bg-border" />
                       {audit.some((a) => a.data?.clause_ref === c.ref) ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-[color:var(--color-success)]">
+                        <span className="inline-flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-foreground">
                           <CheckCircle2 className="h-3.5 w-3.5" /> Signed
                         </span>
                       ) : (
@@ -1031,7 +1078,7 @@ function SignOff() {
                           title={`Commit this decision for ${c.ref}`}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-border-strong bg-transparent px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent"
                         >
-                          <FileSignature className="h-3.5 w-3.5" /> Sign off {c.ref}
+                          <SignatureLine className="h-3.5 w-3.5" /> Sign off {c.ref}
                         </button>
                       )}
                     </div>
@@ -1053,7 +1100,7 @@ function SignOff() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-[11px] text-muted-foreground">{selected.ref}</span>
-                    <h2 className="truncate text-sm font-semibold">{selected.title}</h2>
+                    <h2 className="truncate font-serif text-[16px] font-medium tracking-[-0.01em]">{selected.title}</h2>
                   </div>
                   {analysis && (
                     <span className="text-[11px]" style={{ color: (TIER_STYLE[analysis.classification.tier] ?? TIER_STYLE[2]).color }}>
@@ -1072,15 +1119,15 @@ function SignOff() {
 
               <div className="flex-1 overflow-y-auto scrollbar-thin px-5 py-5 space-y-4">
                 {showAudit && (
-                  <div className="rounded-lg border border-white/[0.06] bg-card/50 p-4">
+                  <div className="animate-reveal rounded-lg border border-white/[0.06] bg-card/50 p-4">
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Audit trail</h3>
                       {auditVerified !== null && (
                         <span
                           className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
                           style={{
-                            color: auditVerified ? "var(--color-success)" : "var(--color-warning)",
-                            backgroundColor: `color-mix(in oklab, ${auditVerified ? "var(--color-success)" : "var(--color-warning)"} 14%, transparent)`,
+                            color: auditVerified ? "var(--color-foreground)" : "var(--color-destructive)",
+                            backgroundColor: `color-mix(in oklab, ${auditVerified ? "var(--color-foreground)" : "var(--color-destructive)"} 12%, transparent)`,
                           }}
                           title="Each record embeds the SHA-256 hash of the previous one. The server recomputes the chain on every read."
                         >
@@ -1091,7 +1138,7 @@ function SignOff() {
                     </div>
                     <Link
                       to="/audit"
-                      className="mb-2 inline-flex items-center gap-1 text-[11px] text-[color:var(--color-info)] hover:underline"
+                      className="mb-2 inline-flex items-center gap-1 text-[11px] text-foreground link-underline"
                     >
                       View full portfolio trail <ArrowUpRight className="h-3 w-3" />
                     </Link>
@@ -1103,7 +1150,7 @@ function SignOff() {
                           <li key={a.id} className="rounded-md border border-border/70 bg-surface/40 px-2.5 py-2">
                             <div className="flex items-center justify-between gap-2">
                               <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold capitalize text-foreground">
-                                <CheckCircle2 className="h-3.5 w-3.5 text-[color:var(--color-success)]" />
+                                <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
                                 {String(a.data?.posture ?? "")} · {String(a.data?.clause_ref ?? "")}
                               </span>
                               <span className="font-mono text-[10px] text-muted-foreground" title={`hash ${a.hash}`}>
@@ -1123,12 +1170,92 @@ function SignOff() {
                 )}
 
                 {loading ? (
-                  <div className="flex items-center gap-2 py-8 text-[13px] text-muted-foreground/80">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Thinking…
+                  <div className="rounded-xl border border-white/[0.06] bg-card/40 p-4">
+                    <div className="mb-3 flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-foreground" />
+                      <span className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Agent mesh executing
+                      </span>
+                      <span className="ml-auto font-mono text-[10px] text-muted-foreground">
+                        {liveTraces.filter((t) => t.status !== "running").length}/{liveTraces.length || "…"}
+                      </span>
+                    </div>
+                    {liveTraces.length === 0 ? (
+                      <p className="text-[12px] text-muted-foreground/80">
+                        Dispatching asymmetric agents…
+                      </p>
+                    ) : (
+                      <ul className="space-y-1.5">
+                        {liveTraces.map((t) => {
+                          const live = t.mode === "live";
+                          const ms =
+                            t.finished_at && t.started_at
+                              ? new Date(t.finished_at).getTime() - new Date(t.started_at).getTime()
+                              : undefined;
+                          const running = t.status === "running";
+                          const failed = t.status === "failed";
+                          return (
+                            <li
+                              key={t.id}
+                              className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-surface/40 px-3 py-2 animate-reveal"
+                            >
+                              {running ? (
+                                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-foreground" />
+                              ) : (
+                                <span
+                                  className="h-2 w-2 shrink-0 rounded-full"
+                                  style={{
+                                    backgroundColor: failed
+                                      ? "var(--color-destructive)"
+                                      : "var(--color-foreground)",
+                                  }}
+                                />
+                              )}
+                              <span
+                                className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider"
+                                style={{
+                                  color: live ? "var(--color-foreground)" : "var(--color-muted-foreground)",
+                                  backgroundColor: live
+                                    ? "color-mix(in oklab, var(--color-foreground) 12%, transparent)"
+                                    : "var(--color-muted)",
+                                }}
+                              >
+                                {live ? "Live" : "Demo"}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-[12px] font-medium text-foreground">
+                                  {serviceForTool(t.tool)}
+                                </p>
+                                <p className="truncate text-[10px] text-muted-foreground">{t.detail}</p>
+                              </div>
+                              {running ? (
+                                <span className="shrink-0 text-[10px] font-medium text-muted-foreground">running…</span>
+                              ) : (
+                                <>
+                                  {ms !== undefined && (
+                                    <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{ms}ms</span>
+                                  )}
+                                  <span
+                                    className="shrink-0 text-[10px] font-medium"
+                                    style={{
+                                      color: failed
+                                        ? "var(--color-destructive)"
+                                        : "var(--color-muted-foreground)",
+                                    }}
+                                  >
+                                    {t.status}
+                                  </span>
+                                </>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
                   </div>
                 ) : selected.severity === "clean" && !analysis ? (
                   <div className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-card/40 px-4 py-3.5 text-[13px] text-muted-foreground">
-                    <ShieldCheck className="h-4 w-4 text-[color:var(--color-success)]" /> No material issues detected.
+                    <Seal className="h-4 w-4 text-muted-foreground" /> No material issues detected.
                   </div>
                 ) : analysis ? (
                   <>
@@ -1141,7 +1268,7 @@ function SignOff() {
                         }}
                       >
                         <div className="mb-3 flex items-center gap-1.5">
-                          <AlertOctagon className="h-3.5 w-3.5" style={{ color: (TIER_STYLE[analysis.classification.tier] ?? TIER_STYLE[2]).color }} />
+                          <Gavel className="h-3.5 w-3.5" style={{ color: (TIER_STYLE[analysis.classification.tier] ?? TIER_STYLE[2]).color }} />
                           <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Why flagged</span>
                         </div>
                         <ul className="space-y-2.5">
@@ -1158,7 +1285,7 @@ function SignOff() {
                     {/* Recommendation */}
                     <div className="rounded-xl border border-white/[0.06] bg-card/60 p-5">
                       <div className="mb-3 flex items-center gap-2">
-                        <Briefcase className="h-3.5 w-3.5" style={{ color: AGENT_META.deal.color }} />
+                        <Seal className="h-3.5 w-3.5" style={{ color: AGENT_META.deal.color }} />
                         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Recommendation</span>
                         <span className="ml-auto rounded-md bg-muted/50 px-2 py-0.5 text-[11px] font-semibold capitalize text-foreground">
                           {analysis.classification.recommended_posture}
@@ -1191,7 +1318,7 @@ function SignOff() {
                         })}
                       </div>
                       {openEvidence && (
-                        <ul className="mt-2 space-y-1.5">
+                        <ul className="mt-2 space-y-1.5 animate-reveal">
                           {analysis.evidence
                             .filter((e) => e.kind === openEvidence)
                             .map((e, i) => (
@@ -1201,7 +1328,7 @@ function SignOff() {
                                 <div className="mt-1 flex items-center justify-between gap-2">
                                   <span className="font-mono text-[10px] text-muted-foreground">{e.source}</span>
                                   {e.url && (
-                                    <a href={e.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[10px] text-[color:var(--color-info)] hover:underline">
+                                    <a href={e.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[10px] text-foreground link-underline">
                                       Open <ArrowUpRight className="h-3 w-3" />
                                     </a>
                                   )}
@@ -1225,7 +1352,7 @@ function SignOff() {
                           <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showProvenance ? "" : "-rotate-90"}`} />
                         </button>
                         {showProvenance && (
-                          <ul className="mt-2 space-y-1.5">
+                          <ul className="mt-2 space-y-1.5 animate-reveal">
                             {analysis.traces.map((t) => {
                               const live = t.mode === "live";
                               const ms =
@@ -1240,9 +1367,9 @@ function SignOff() {
                                   <span
                                     className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider"
                                     style={{
-                                      color: live ? "var(--color-success)" : "var(--color-muted-foreground)",
+                                      color: live ? "var(--color-foreground)" : "var(--color-muted-foreground)",
                                       backgroundColor: live
-                                        ? "color-mix(in oklab, var(--color-success) 14%, transparent)"
+                                        ? "color-mix(in oklab, var(--color-foreground) 12%, transparent)"
                                         : "var(--color-muted)",
                                     }}
                                   >
@@ -1262,7 +1389,7 @@ function SignOff() {
                                     style={{
                                       color:
                                         t.status === "failed"
-                                          ? "var(--color-warning)"
+                                          ? "var(--color-destructive)"
                                           : "var(--color-muted-foreground)",
                                     }}
                                   >
@@ -1287,7 +1414,7 @@ function SignOff() {
                         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showReasoning ? "" : "-rotate-90"}`} />
                       </button>
                       {showReasoning && (
-                        <div className="mt-2 space-y-2">
+                        <div className="mt-2 space-y-2 animate-reveal">
                           {analysis.agents.map((a) => {
                             const m = AGENT_META[uiAgent(a.agent)];
                             const { Icon } = m;
@@ -1318,11 +1445,11 @@ function SignOff() {
                                 )}
                                 {a.red_flags.length > 0 && (
                                   <div className="mt-1.5">
-                                    <Disclosure title="Red flags" icon={AlertTriangle} count={a.red_flags.length} tone="var(--color-warning)">
+                                    <Disclosure title="Red flags" icon={Gavel} count={a.red_flags.length} tone="var(--color-destructive)">
                                       <ul className="space-y-1">
                                         {a.red_flags.map((x, i) => (
                                           <li key={i} className="flex items-start gap-2 text-[12px] text-foreground">
-                                            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-[color:var(--color-warning)]" />
+                                            <Gavel className="mt-0.5 h-3 w-3 shrink-0 text-[color:var(--color-destructive)]" />
                                             <span>{x}</span>
                                           </li>
                                         ))}
@@ -1340,7 +1467,7 @@ function SignOff() {
                 ) : (
                   <div className="py-8 text-[13px] text-muted-foreground">
                     Couldn't reach the agent mesh.{" "}
-                    <button onClick={() => selected && runAnalysis(selected, selected.text)} className="text-[color:var(--color-info)] hover:underline">
+                    <button onClick={() => selected && runAnalysis(selected, selected.text)} className="text-foreground link-underline">
                       Retry
                     </button>
                   </div>
@@ -1420,7 +1547,7 @@ function SignOff() {
           <span className="flex items-center gap-1">
             <span
               className="h-1.5 w-1.5 rounded-full"
-              style={{ background: meshLive ? "var(--color-success)" : "var(--color-warning)" }}
+              style={{ background: meshLive ? "var(--color-foreground)" : "var(--color-muted-foreground)" }}
             />
             {health ? (meshLive ? "mesh: live" : "mesh: demo") : "mesh: offline"}
           </span>

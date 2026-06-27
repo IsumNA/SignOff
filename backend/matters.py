@@ -44,37 +44,82 @@ TASK_COLUMNS = (
 #   warning  — has Tier 2 warnings (material)
 #   escalate — junior escalation requests awaiting partner
 #   passed   — all controls passed; cleared to sign
+#
+# Illustrative demo portfolio modelled on Clifford Chance's core practice areas
+# (Private Equity, Energy & Infrastructure, Capital Markets, Leveraged Finance,
+# M&A/Antitrust, Real Estate). Clients/counterparties are well-known public
+# companies used purely as realistic placeholders for the demo — not a record of
+# any actual engagement.
 _MATTERS: List[Dict[str, Any]] = [
     {
-        "id": "atlas",
-        "name": "Project Atlas",
-        "asset_class": "M&A",
-        "deal_size": "$120M",
-        "agents_deployed": ["Gemini 1.5 Pro", "Claude 3.5 Sonnet", "Local NIM"],
-        "compliance_envelope": 87,
+        "id": "pennine",
+        "name": "Project Pennine",
+        "asset_class": "Private Equity",
+        "client": "CVC Capital Partners",
+        "counterparty": "Recordati S.p.A.",
+        "jurisdiction": "English & Italian law",
+        "deal_size": "€6.7bn",
+        "agents_deployed": ["Gemini 2.0 Flash", "Claude 3.5 Sonnet", "Local NIM"],
+        "compliance_envelope": 86,
         "blockers": {"count": 2, "tier": 3, "label": "Blocker Exceptions"},
         "status": "review",
         "stage": "review",
         "action": "review",
     },
     {
-        "id": "titan",
-        "name": "Project Titan",
-        "asset_class": "Debt Financing",
-        "deal_size": "$45M",
-        "agents_deployed": ["GPT-4o", "Harvey"],
-        "compliance_envelope": 98,
+        "id": "mersey",
+        "name": "Project Mersey",
+        "asset_class": "M&A / Antitrust",
+        "client": "Vodafone Group plc",
+        "counterparty": "CK Hutchison (Three UK)",
+        "jurisdiction": "English law",
+        "deal_size": "£15.0bn",
+        "agents_deployed": ["Gemini 2.0 Flash", "Perplexity", "Local NIM"],
+        "compliance_envelope": 81,
+        "blockers": {"count": 1, "tier": 3, "label": "Merger Control Hold"},
+        "status": "review",
+        "stage": "review",
+        "action": "review",
+    },
+    {
+        "id": "severn",
+        "name": "Project Severn",
+        "asset_class": "Energy & Infrastructure",
+        "client": "Macquarie Asset Management",
+        "counterparty": "National Grid plc",
+        "jurisdiction": "English law",
+        "deal_size": "£4.2bn",
+        "agents_deployed": ["Gemini 2.0 Flash", "Perplexity"],
+        "compliance_envelope": 93,
         "blockers": {"count": 1, "tier": 2, "label": "Warning"},
         "status": "warning",
         "stage": "review",
         "action": "review",
     },
     {
-        "id": "helios",
-        "name": "Helios Energy",
-        "asset_class": "Regulatory Audit",
-        "deal_size": "—",
-        "agents_deployed": ["Llama-3 (Local)", "Perplexity"],
+        "id": "camden",
+        "name": "Project Camden",
+        "asset_class": "Equity Capital Markets",
+        "client": "Barclays Bank PLC (Sponsor)",
+        "counterparty": "London Stock Exchange listing",
+        "jurisdiction": "English law",
+        "deal_size": "£1.1bn",
+        "agents_deployed": ["Gemini 2.0 Flash", "Harvey"],
+        "compliance_envelope": 68,
+        "blockers": {"count": 4, "tier": 2, "label": "Escalate Requests"},
+        "status": "escalate",
+        "stage": "coordinate",
+        "action": "review",
+    },
+    {
+        "id": "tay",
+        "name": "Project Tay",
+        "asset_class": "Leveraged Finance",
+        "client": "Blackstone Credit",
+        "counterparty": "Deutsche Bank (Arranger)",
+        "jurisdiction": "New York & English law",
+        "deal_size": "$3.5bn",
+        "agents_deployed": ["Gemini 2.0 Flash", "Local NIM", "Perplexity"],
         "compliance_envelope": 100,
         "blockers": {"count": 0, "tier": 0, "label": "Passed Controls"},
         "status": "passed",
@@ -82,23 +127,14 @@ _MATTERS: List[Dict[str, Any]] = [
         "action": "signoff",
     },
     {
-        "id": "vanguard",
-        "name": "Vanguard JV",
-        "asset_class": "Joint Venture",
-        "deal_size": "$15M",
-        "agents_deployed": ["Gemini 1.5 Pro"],
-        "compliance_envelope": 64,
-        "blockers": {"count": 4, "tier": 2, "label": "Escalate Requests"},
-        "status": "escalate",
-        "stage": "coordinate",
-        "action": "review",
-    },
-    {
-        "id": "meridian",
-        "name": "Meridian Logistics",
-        "asset_class": "Asset Purchase",
-        "deal_size": "$210M",
-        "agents_deployed": ["Gemini 1.5 Pro", "Local NIM", "Perplexity"],
+        "id": "thames",
+        "name": "Project Thames",
+        "asset_class": "Real Estate",
+        "client": "Brookfield Asset Management",
+        "counterparty": "British Land Company plc",
+        "jurisdiction": "English law",
+        "deal_size": "£2.3bn",
+        "agents_deployed": ["Gemini 2.0 Flash", "Local NIM"],
         "compliance_envelope": 100,
         "blockers": {"count": 0, "tier": 0, "label": "Passed Controls"},
         "status": "passed",
@@ -163,7 +199,7 @@ def create_matter(data: Dict[str, Any]) -> Dict[str, Any]:
     clean (no-blocker) status, ready for the partner to watch the mesh work.
     """
     name = (data.get("name") or "Untitled Matter").strip()
-    agents = [a for a in (data.get("agents_deployed") or []) if a] or ["Gemini 1.5 Pro"]
+    agents = [a for a in (data.get("agents_deployed") or []) if a] or ["Gemini 2.0 Flash"]
     envelope = int(data.get("envelope_target") or 100)
     envelope = max(0, min(100, envelope))
 
@@ -171,6 +207,8 @@ def create_matter(data: Dict[str, Any]) -> Dict[str, Any]:
         "id": _slugify(name),
         "name": name,
         "asset_class": (data.get("asset_class") or "M&A").strip(),
+        "client": (data.get("client") or "").strip() or None,
+        "counterparty": (data.get("counterparty") or "").strip() or None,
         "deal_size": (data.get("deal_size") or "—").strip(),
         "agents_deployed": agents,
         "compliance_envelope": envelope,
@@ -191,22 +229,25 @@ def create_matter(data: Dict[str, Any]) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # (ii) COORDINATE — the workstream board
 # ---------------------------------------------------------------------------
-# Canonical workstreams a corporate matter is decomposed into. Each becomes a
-# card that flows across the mesh pipeline on the Coordinate board.
+# Canonical workstreams a Clifford Chance corporate matter is decomposed into.
+# Each becomes a card that flows across the mesh pipeline on the Coordinate
+# board — mirroring the diligence/negotiation streams a supervising partner
+# actually oversees on a cross-border transaction.
 _WORKSTREAMS: List[Dict[str, str]] = [
-    {"ref": "§2.1", "title": "Purchase Price & Adjustments"},
-    {"ref": "§4.1", "title": "Interim Operating Covenants"},
-    {"ref": "§7.3", "title": "Material Adverse Change"},
-    {"ref": "§8.2", "title": "Data Protection & Processing"},
-    {"ref": "§9.1", "title": "Seller Indemnification"},
-    {"ref": "§11.2", "title": "Confidentiality"},
-    {"ref": "§13.4", "title": "Governing Law & Jurisdiction"},
+    {"ref": "§3.1", "title": "Consideration & Completion Accounts"},
+    {"ref": "§5.2", "title": "Conduct of Business (Interim Covenants)"},
+    {"ref": "§8.4", "title": "Material Adverse Change"},
+    {"ref": "§9.3", "title": "Data Protection & International Transfers"},
+    {"ref": "§11.1", "title": "Warranties, Limitations & Indemnities"},
+    {"ref": "§12.5", "title": "Sanctions, ABC & Export Controls"},
+    {"ref": "§14.2", "title": "Conditions: Merger Control & FDI"},
+    {"ref": "§17.3", "title": "Governing Law & Jurisdiction"},
 ]
 
-# Per lifecycle stage, how the 7 workstreams distribute across the board.
+# Per lifecycle stage, how the 8 workstreams distribute across the board.
 # Index i of the tuple = workstream i's column.
 _STAGE_DISTRIBUTION: Dict[str, List[str]] = {
-    "plan": ["queued", "queued", "queued", "queued", "queued", "queued", "queued"],
+    "plan": ["queued"] * 8,
     "coordinate": [
         "signed",
         "synthesis",
@@ -215,6 +256,7 @@ _STAGE_DISTRIBUTION: Dict[str, List[str]] = {
         "risk",
         "risk",
         "queued",
+        "queued",
     ],
     "review": [
         "signed",
@@ -222,7 +264,8 @@ _STAGE_DISTRIBUTION: Dict[str, List[str]] = {
         "counsel",
         "synthesis",
         "counsel",
-        "signed",
+        "research",
+        "counsel",
         "signed",
     ],
     "signoff": [
@@ -230,8 +273,9 @@ _STAGE_DISTRIBUTION: Dict[str, List[str]] = {
         "signed",
         "signed",
         "signed",
-        "counsel",
         "signed",
+        "signed",
+        "counsel",
         "signed",
     ],
 }
@@ -240,7 +284,7 @@ _COLUMN_AGENT: Dict[str, str] = {
     "queued": "Unassigned",
     "risk": "Risk Agent · NIM",
     "precedent": "Precedent Agent · Neo4j",
-    "research": "Research Agent · Perplexity",
+    "research": "Research Agent · Perplexity + EU Cellar",
     "synthesis": "Deal Agent · Gemini",
     "counsel": "Awaiting Counsel",
     "signed": "Signed",
@@ -248,7 +292,7 @@ _COLUMN_AGENT: Dict[str, str] = {
 
 
 def _card_tier(ref: str, column: str) -> int:
-    high = {"§9.1": 3, "§7.3": 3, "§4.1": 2, "§8.2": 2}
+    high = {"§8.4": 3, "§11.1": 3, "§14.2": 3, "§5.2": 2, "§9.3": 2, "§12.5": 2}
     if column == "signed":
         return 1
     return high.get(ref, 1)

@@ -1,20 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
-import {
-  ArrowLeft,
-  Check,
-  ChevronRight,
-  Cpu,
-  Gauge,
-  Loader2,
-  Plus,
-  Rocket,
-  ShieldAlert,
-  X,
-} from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Loader2, Plus, X } from "lucide-react";
 import { createMatter } from "@/lib/api";
 import { LifecycleStepper } from "@/components/Lifecycle";
 import { Brand } from "@/components/Brand";
+import { Gavel, Scales, Workstreams } from "@/components/icons";
 
 export const Route = createFileRoute("/plan")({
   head: () => ({
@@ -31,27 +21,37 @@ export const Route = createFileRoute("/plan")({
 });
 
 const ASSET_CLASSES = [
-  "M&A",
-  "Debt Financing",
-  "Joint Venture",
-  "Asset Purchase",
-  "Regulatory Audit",
+  "M&A / Antitrust",
+  "Private Equity",
+  "Leveraged Finance",
+  "Equity Capital Markets",
+  "Energy & Infrastructure",
+  "Real Estate",
+  "Funds",
 ];
-const JURISDICTIONS = ["English law", "Delaware law", "New York law", "EU"];
+const JURISDICTIONS = [
+  "English law",
+  "New York law",
+  "Luxembourg law",
+  "German law",
+  "Italian law",
+  "EU / cross-border",
+];
 const SCOPE_OPTIONS = [
-  "Purchase Price",
-  "Covenants",
+  "Consideration & Completion Accounts",
+  "Interim Covenants",
   "Material Adverse Change",
   "Data Protection",
-  "Indemnities",
-  "Confidentiality",
+  "Warranties & Indemnities",
+  "Sanctions & ABC",
+  "Merger Control & FDI",
   "Governing Law",
 ];
-const AGENT_OPTIONS: { name: string; role: string; color: string }[] = [
-  { name: "Local NIM", role: "On-prem high-security risk", color: "var(--color-nvidia)" },
-  { name: "Gemini 1.5 Pro", role: "Synthesis & decisioning", color: "var(--color-vertex)" },
-  { name: "Perplexity", role: "Web-grounded research", color: "var(--color-deal)" },
-  { name: "Claude 3.5 Sonnet", role: "Precedent drafting", color: "var(--color-deal)" },
+const AGENT_OPTIONS: { name: string; role: string }[] = [
+  { name: "Local NIM", role: "On-prem high-security risk" },
+  { name: "Gemini 2.0 Flash", role: "Synthesis & decisioning" },
+  { name: "Perplexity", role: "Web-grounded research" },
+  { name: "Claude 3.5 Sonnet", role: "Precedent drafting" },
 ];
 
 function Field({
@@ -108,14 +108,20 @@ function PlanMatter() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [assetClass, setAssetClass] = useState(ASSET_CLASSES[0]);
+  const [client, setClient] = useState("");
+  const [counterparty, setCounterparty] = useState("");
   const [dealSize, setDealSize] = useState("");
   const [jurisdiction, setJurisdiction] = useState(JURISDICTIONS[0]);
   const [envelope, setEnvelope] = useState(95);
   const [escalationTier, setEscalationTier] = useState(3);
-  const [scope, setScope] = useState<string[]>(["Indemnities", "Material Adverse Change"]);
-  const [agents, setAgents] = useState<string[]>(["Local NIM", "Gemini 1.5 Pro"]);
+  const [scope, setScope] = useState<string[]>([
+    "Warranties & Indemnities",
+    "Merger Control & FDI",
+  ]);
+  const [agents, setAgents] = useState<string[]>(["Local NIM", "Gemini 2.0 Flash"]);
   const [redlines, setRedlines] = useState<string[]>([
     "No uncapped indemnities without partner sign-off",
+    "No remedies offered to competition authorities without partner approval",
   ]);
   const [redlineDraft, setRedlineDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -146,6 +152,8 @@ function PlanMatter() {
       const m = await createMatter({
         name: name.trim(),
         asset_class: assetClass,
+        client: client.trim() || undefined,
+        counterparty: counterparty.trim() || undefined,
         deal_size: dealSize.trim() || "—",
         jurisdiction,
         agents_deployed: agents,
@@ -184,9 +192,11 @@ function PlanMatter() {
             <ArrowLeft className="h-3.5 w-3.5" /> Back to ledger
           </Link>
 
-          <div className="mb-7">
-            <h1 className="text-xl font-bold tracking-tight">Plan a New Matter</h1>
-            <p className="mt-1 text-[13px] text-muted-foreground">
+          <div className="mb-8">
+            <h1 className="font-serif text-[30px] font-medium leading-tight tracking-[-0.02em]">
+              Plan a New Matter
+            </h1>
+            <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-muted-foreground">
               Stage 1 of supervision. Define the deterministic risk envelope the agents must
               operate inside, then deploy them. Nothing runs until you set the guardrails.
             </p>
@@ -194,8 +204,8 @@ function PlanMatter() {
 
           <div className="grid gap-5">
             {/* Scope */}
-            <section className="rounded-xl border border-border bg-card/30 p-5">
-              <h2 className="mb-4 text-[13px] font-bold">Matter scope</h2>
+            <section className="rounded-xl border border-border bg-card/30 p-6">
+              <h2 className="mb-5 font-serif text-[18px] font-medium tracking-[-0.01em]">Matter scope</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Matter name">
                   <input
@@ -206,19 +216,35 @@ function PlanMatter() {
                     autoFocus
                   />
                 </Field>
-                <Field label="Asset class">
+                <Field label="Practice area">
                   <select className={inputCls} value={assetClass} onChange={(e) => setAssetClass(e.target.value)}>
                     {ASSET_CLASSES.map((a) => (
                       <option key={a} value={a}>{a}</option>
                     ))}
                   </select>
                 </Field>
+                <Field label="Client">
+                  <input
+                    className={inputCls}
+                    value={client}
+                    onChange={(e) => setClient(e.target.value)}
+                    placeholder="e.g. CVC Capital Partners"
+                  />
+                </Field>
+                <Field label="Counterparty">
+                  <input
+                    className={inputCls}
+                    value={counterparty}
+                    onChange={(e) => setCounterparty(e.target.value)}
+                    placeholder="e.g. Recordati S.p.A."
+                  />
+                </Field>
                 <Field label="Deal size">
                   <input
                     className={inputCls}
                     value={dealSize}
                     onChange={(e) => setDealSize(e.target.value)}
-                    placeholder="e.g. $300M"
+                    placeholder="e.g. €6.7bn"
                   />
                 </Field>
                 <Field label="Governing law">
@@ -232,10 +258,10 @@ function PlanMatter() {
             </section>
 
             {/* Envelope */}
-            <section className="rounded-xl border border-border bg-card/30 p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <Gauge className="h-4 w-4 text-[color:var(--color-warning)]" />
-                <h2 className="text-[13px] font-bold">Risk envelope</h2>
+            <section className="rounded-xl border border-border bg-card/30 p-6">
+              <div className="mb-5 flex items-center gap-2">
+                <Scales className="h-4 w-4 text-muted-foreground" />
+                <h2 className="font-serif text-[18px] font-medium tracking-[-0.01em]">Risk envelope</h2>
                 <span className="text-[11px] text-muted-foreground">— the deterministic guardrails</span>
               </div>
 
@@ -247,7 +273,7 @@ function PlanMatter() {
                     max={100}
                     value={envelope}
                     onChange={(e) => setEnvelope(Number(e.target.value))}
-                    className="w-full accent-[color:var(--color-warning)]"
+                    className="w-full accent-[color:var(--color-foreground)]"
                   />
                   <span className="mt-1 block text-[11px] text-muted-foreground">
                     Matters below this envelope are auto-flagged for partner review.
@@ -282,7 +308,7 @@ function PlanMatter() {
 
               <div className="mt-5">
                 <span className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  <ShieldAlert className="h-3.5 w-3.5" /> Hard red-lines (never auto-pass)
+                  <Gavel className="h-3.5 w-3.5" /> Hard red-lines (never auto-pass)
                 </span>
                 <div className="flex flex-wrap gap-2">
                   {redlines.map((r) => (
@@ -322,10 +348,10 @@ function PlanMatter() {
             </section>
 
             {/* Agents */}
-            <section className="rounded-xl border border-border bg-card/30 p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <Cpu className="h-4 w-4 text-[color:var(--color-vertex)]" />
-                <h2 className="text-[13px] font-bold">Deploy agents</h2>
+            <section className="rounded-xl border border-border bg-card/30 p-6">
+              <div className="mb-5 flex items-center gap-2">
+                <Workstreams className="h-4 w-4 text-muted-foreground" />
+                <h2 className="font-serif text-[18px] font-medium tracking-[-0.01em]">Deploy agents</h2>
                 <span className="text-[11px] text-muted-foreground">— the autonomous workforce, bounded by the envelope</span>
               </div>
               <div className="grid gap-2.5 sm:grid-cols-2">
@@ -340,8 +366,8 @@ function PlanMatter() {
                         active ? "border-border-strong bg-surface-elevated/60" : "border-border hover:bg-accent/40"
                       }`}
                     >
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: `color-mix(in oklab, ${a.color} 18%, transparent)` }}>
-                        <span className="h-2 w-2 rounded-full" style={{ background: a.color }} />
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground">
+                        <Workstreams className="h-3.5 w-3.5" />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[13px] font-semibold text-foreground">{a.name}</span>
@@ -371,7 +397,7 @@ function PlanMatter() {
                 disabled={submitting}
                 className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-[13px] font-semibold text-background transition hover:opacity-90 disabled:opacity-60"
               >
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Workstreams className="h-4 w-4" />}
                 Deploy agents &amp; open board
               </button>
             </div>

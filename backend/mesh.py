@@ -31,6 +31,7 @@ from datetime import datetime, timezone
 from time import perf_counter
 from typing import Any, Awaitable, Callable, Dict, List, Tuple
 
+import events
 from config import (
     get_gemini_model,
     neo4j_is_live,
@@ -70,9 +71,32 @@ async def _run_tool(
     coro: Awaitable[Dict[str, Any]],
     detail: str,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    """Await a tool coroutine while recording a frontend-shaped trace."""
+    """Await a tool coroutine while recording a frontend-shaped trace.
+
+    Publishes a ``running`` frame the instant the tool starts and a terminal
+    ``success``/``failed`` frame (same trace ``id``) when it returns, so the SSE
+    stream shows each agent light up and resolve in real time.
+    """
+    trace_id = str(uuid.uuid4())
     started_at = _now()
     t0 = perf_counter()
+
+    events.publish(
+        session_id,
+        {
+            "id": trace_id,
+            "session_id": session_id,
+            "agent": agent,
+            "tool": tool,
+            "status": "running",
+            "detail": detail,
+            "mode": mode,
+            "started_at": started_at,
+            "finished_at": None,
+            "payload": {},
+        },
+    )
+
     try:
         result = await coro
         status = (
@@ -83,8 +107,9 @@ async def _run_tool(
         result = {"error": str(exc)}
         status = "failed"
 
+    payload = result if isinstance(result, dict) else {"value": result}
     trace = {
-        "id": str(uuid.uuid4()),
+        "id": trace_id,
         "session_id": session_id,
         "agent": agent,
         "tool": tool,
@@ -93,12 +118,12 @@ async def _run_tool(
         "mode": mode,
         "started_at": started_at,
         "finished_at": _now(),
-        "payload": result if isinstance(result, dict) else {"value": result},
+        "payload": {
+            "duration_ms": int((perf_counter() - t0) * 1000),
+            **payload,
+        },
     }
-    trace["payload"] = {
-        "duration_ms": int((perf_counter() - t0) * 1000),
-        **trace["payload"],
-    }
+    events.publish(session_id, trace)
     return result, trace
 
 
@@ -448,9 +473,29 @@ async def run_mesh(
     traces.extend([nim_trace, graph_trace, eu_trace, web_trace])
 
     # --- Synthesis (Gemini live, deterministic demo otherwise) -----------
+    synth_id = str(uuid.uuid4())
+    synth_mode = "live" if vertex_is_live() else "demo"
+    synth_detail = "Fuse asymmetric signals into a risk tier (strict JSON)."
     synth_started = _now()
     synth_t0 = perf_counter()
     synth_status = "success"
+
+    events.publish(
+        session_id,
+        {
+            "id": synth_id,
+            "session_id": session_id,
+            "agent": "Deal Agent",
+            "tool": "gemini_reason",
+            "status": "running",
+            "detail": synth_detail,
+            "mode": synth_mode,
+            "started_at": synth_started,
+            "finished_at": None,
+            "payload": {},
+        },
+    )
+
     if vertex_is_live():
         try:
             synthesized = await _gemini_synthesis(
@@ -464,23 +509,26 @@ async def run_mesh(
     else:
         synthesized = _demo_synthesis(clause_text, nim, graph, web, eu)
 
-    traces.append(
-        {
-            "id": str(uuid.uuid4()),
-            "session_id": session_id,
-            "agent": "Deal Agent",
-            "tool": "gemini_reason",
-            "status": synth_status,
-            "detail": "Fuse asymmetric signals into a risk tier (strict JSON).",
-            "mode": "live" if vertex_is_live() else "demo",
-            "started_at": synth_started,
-            "finished_at": _now(),
-            "payload": {"duration_ms": int((perf_counter() - synth_t0) * 1000)},
-        }
-    )
+    synth_trace = {
+        "id": synth_id,
+        "session_id": session_id,
+        "agent": "Deal Agent",
+        "tool": "gemini_reason",
+        "status": synth_status,
+        "detail": synth_detail,
+        "mode": synth_mode,
+        "started_at": synth_started,
+        "finished_at": _now(),
+        "payload": {"duration_ms": int((perf_counter() - synth_t0) * 1000)},
+    }
+    events.publish(session_id, synth_trace)
+    traces.append(synth_trace)
 
     demo = not vertex_is_live() or synth_status == "failed"
     evidence = _build_evidence(graph, web, eu, demo, effective_type)
+
+    # Close out the live stream for any attached SSE subscribers.
+    events.mark_done(session_id)
 
     return {
         "session_id": session_id,

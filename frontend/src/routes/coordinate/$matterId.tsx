@@ -1,14 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import {
-  ArrowLeft,
-  ArrowUpRight,
-  ChevronRight,
-  Cpu,
-  Gauge,
-  Loader2,
-  ScanSearch,
-} from "lucide-react";
+import { ArrowLeft, ArrowUpRight, ChevronRight, Cpu, Loader2 } from "lucide-react";
 import {
   getMatters,
   getTasks,
@@ -19,6 +11,7 @@ import {
 } from "@/lib/api";
 import { LifecycleStepper } from "@/components/Lifecycle";
 import { Brand } from "@/components/Brand";
+import { ReviewGlass, Scales } from "@/components/icons";
 
 export const Route = createFileRoute("/coordinate/$matterId")({
   head: () => ({
@@ -35,18 +28,18 @@ export const Route = createFileRoute("/coordinate/$matterId")({
 
 const COLUMN_META: Record<TaskColumn, { label: string; color: string }> = {
   queued: { label: "Queued", color: "var(--color-muted-foreground)" },
-  risk: { label: "Risk Agent", color: "var(--color-nvidia)" },
-  precedent: { label: "Precedent", color: "var(--color-info)" },
-  research: { label: "Research", color: "var(--color-deal)" },
-  synthesis: { label: "Synthesis", color: "var(--color-vertex)" },
-  counsel: { label: "Awaiting Counsel", color: "var(--color-warning)" },
-  signed: { label: "Signed", color: "var(--color-success)" },
+  risk: { label: "Risk Agent", color: "var(--color-foreground)" },
+  precedent: { label: "Precedent", color: "var(--color-foreground)" },
+  research: { label: "Research", color: "var(--color-foreground)" },
+  synthesis: { label: "Synthesis", color: "var(--color-foreground)" },
+  counsel: { label: "Awaiting Counsel", color: "var(--color-foreground)" },
+  signed: { label: "Signed", color: "var(--color-muted-foreground)" },
 };
 
 function tierColor(tier: number): string {
   if (tier >= 3) return "var(--color-destructive)";
-  if (tier === 2) return "var(--color-warning)";
-  return "var(--color-success)";
+  if (tier === 2) return "var(--color-foreground)";
+  return "var(--color-muted-foreground)";
 }
 
 function TaskCard({ task, onOpen }: { task: Task; onOpen: () => void }) {
@@ -69,7 +62,7 @@ function TaskCard({ task, onOpen }: { task: Task; onOpen: () => void }) {
         {task.title}
       </span>
       {task.flagged && task.note && (
-        <span className="mt-1.5 block text-[11px] leading-snug text-[color:var(--color-warning)]">
+        <span className="mt-1.5 block text-[11px] leading-snug text-[color:var(--color-destructive)]">
           {task.note}
         </span>
       )}
@@ -130,7 +123,7 @@ function Coordinate() {
           </Link>
           <div className="h-4 w-px bg-border" />
           <div className="min-w-0">
-            <h1 className="text-[14px] font-bold tracking-tight">Coordination board</h1>
+            <h1 className="font-serif text-[19px] font-medium tracking-[-0.01em]">Coordination board</h1>
             <p className="text-[11.5px] text-muted-foreground">
               Stage 2 — agents pick up workstreams and move them across the mesh.
             </p>
@@ -139,14 +132,14 @@ function Coordinate() {
         <div className="flex items-center gap-4">
           {matter && (
             <span className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
-              <Gauge className="h-3.5 w-3.5" /> {matter.compliance_envelope}% envelope
+              <Scales className="h-3.5 w-3.5" /> {matter.compliance_envelope}% envelope
             </span>
           )}
           <button
             onClick={openReview}
             className="inline-flex items-center gap-1.5 rounded-lg border border-border-strong px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground"
           >
-            <ScanSearch className="h-3.5 w-3.5" /> Open Review workspace
+            <ReviewGlass className="h-3.5 w-3.5" /> Open Review workspace
           </button>
         </div>
       </div>
@@ -168,15 +161,17 @@ function Coordinate() {
               const meta = COLUMN_META[col];
               const cards = board.tasks.filter((t) => t.column === col);
               return (
-                <div key={col} className="flex h-full w-[230px] shrink-0 flex-col">
-                  <div className="mb-2 flex items-center justify-between px-1">
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider" style={{ color: meta.color }}>
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: meta.color }} />
+                <div key={col} className="flex h-full w-[240px] shrink-0 flex-col">
+                  <div className="mb-2.5 flex items-center justify-between px-1">
+                    <span className="text-[10.5px] font-semibold uppercase tracking-[0.1em]" style={{ color: meta.color }}>
                       {meta.label}
                     </span>
-                    <span className="font-mono text-[11px] text-muted-foreground">{cards.length}</span>
+                    <span className="font-mono text-[11px] text-muted-foreground tabular-nums">{cards.length}</span>
                   </div>
-                  <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-xl border border-border bg-card/20 p-2 scrollbar-thin">
+                  <div
+                    className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-xl border border-border bg-card/20 p-2 scrollbar-thin"
+                    style={{ borderTop: `2px solid ${meta.color === "var(--color-muted-foreground)" ? "var(--color-border-strong)" : meta.color}` }}
+                  >
                     {cards.length === 0 ? (
                       <span className="px-1 py-2 text-[11px] text-muted-foreground/60">—</span>
                     ) : (

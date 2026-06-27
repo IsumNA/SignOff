@@ -7,6 +7,7 @@ on Cloud Run; runs locally in demo mode without any cloud credentials.
 Endpoints (frontend contract):
   GET  /api/health                — integration status (live/demo)
   POST /api/chat                  — run the mesh on a clause / question
+  GET  /api/trace/{id}/stream     — live SSE stream of multi-agent tool traces
   POST /api/signoff               — record a counsel decision to the audit trail
 
 Additional:
@@ -16,14 +17,17 @@ Additional:
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from config import (
@@ -34,6 +38,7 @@ from config import (
     integration_status,
 )
 import audit
+import events as trace_events
 from matters import create_matter, get_matter, list_matters, list_tasks
 from mesh import run_mesh
 
@@ -122,6 +127,9 @@ class Matter(BaseModel):
     id: str
     name: str
     asset_class: str
+    client: Optional[str] = None
+    counterparty: Optional[str] = None
+    jurisdiction: Optional[str] = None
     deal_size: str
     agents_deployed: List[str]
     compliance_envelope: int
@@ -148,6 +156,8 @@ class MatterCreate(BaseModel):
 
     name: str = Field(..., min_length=1)
     asset_class: str = "M&A"
+    client: Optional[str] = None
+    counterparty: Optional[str] = None
     deal_size: str = "—"
     jurisdiction: str = "English law"
     agents_deployed: List[str] = Field(default_factory=list)
@@ -320,6 +330,7 @@ async def root() -> Dict[str, Any]:
             "/api/health",
             "/api/matters",
             "/api/chat",
+            "/api/trace/{session_id}/stream",
             "/api/signoff",
             "/api/audit",
             "/api/audit/verify",
@@ -404,6 +415,9 @@ async def chat(payload: ChatRequest) -> ChatResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal error while analyzing the clause.",
         ) from exc
+    finally:
+        # Guarantee any attached SSE stream closes, even on failure.
+        trace_events.mark_done(payload.session_id)
 
     cls = result["classification"]
     live_tools = [t["tool"] for t in result.get("traces", []) if t.get("mode") == "live"]
@@ -427,6 +441,48 @@ async def chat(payload: ChatRequest) -> ChatResponse:
     )
 
     return ChatResponse(**result)
+
+
+@app.get("/api/trace/{session_id}/stream")
+async def trace_stream(session_id: str, request: Request) -> StreamingResponse:
+    """Stream live multi-agent execution traces for a session via SSE.
+
+    The Review workspace opens this stream just before kicking off an analysis;
+    the mesh then publishes a ``running`` frame as each tool (NIM, Neo4j,
+    Perplexity, EU Cellar, Gemini) starts and a terminal frame when it resolves.
+    History is replayed on connect, so a stream attached a few milliseconds late
+    still receives every frame. Each frame is a JSON ``BackendTrace`` object.
+    """
+
+    async def event_source() -> AsyncIterator[str]:
+        sub = trace_events.subscribe(session_id)
+        # Comment frame opens the stream immediately (and primes proxies).
+        yield ": connected\n\n"
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                # 15s heartbeat keeps the connection (and any proxy) alive.
+                frame = await sub.get(timeout=15.0)
+                if frame is None:
+                    yield ": ping\n\n"
+                    continue
+                if frame.get("__done__"):
+                    yield "event: done\ndata: {}\n\n"
+                    break
+                yield f"data: {json.dumps(frame, ensure_ascii=False)}\n\n"
+        finally:
+            sub.close()
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.post("/api/signoff", response_model=SignOffRecord)
@@ -481,6 +537,8 @@ async def analyze_clause_endpoint(payload: AnalyzeClauseRequest) -> ChatResponse
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal error while analyzing the clause.",
         ) from exc
+    finally:
+        trace_events.mark_done(session_id)
 
     cls = result["classification"]
     await _audit(

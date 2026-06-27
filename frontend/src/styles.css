@@ -38,6 +38,7 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Spectral", ui-serif, Georgia, "Times New Roman", serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
@@ -88,6 +89,55 @@
     -webkit-font-smoothing: antialiased;
     font-feature-settings: "cv11", "ss01";
   }
+  /* Serif display: legal-document tension against the sans body.
+     Tighter tracking + optical sizing so headlines feel set, not generated. */
+  .font-serif {
+    font-feature-settings: "liga", "onum";
+    letter-spacing: -0.01em;
+  }
+  /* Mono numerals read as legal citations (§7.3, hashes, sizes). */
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+}
+
+/* ── Micro-interactions ────────────────────────────────────────────────── */
+
+@utility animate-reveal {
+  animation: reveal 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@utility animate-rise {
+  animation: rise 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Signature stroke draw — used on the brand mark and sign-off affordances. */
+@utility animate-sign {
+  stroke-dasharray: 64;
+  stroke-dashoffset: 64;
+  animation: sign-draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.1s forwards;
+}
+
+@keyframes sign-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* A restrained underline that grows from the left on hover. */
+@utility link-underline {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 0% 1px;
+  transition: background-size 0.25s ease;
+  &:hover { background-size: 100% 1px; }
 }
 
 @utility scrollbar-thin {

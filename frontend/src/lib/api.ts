@@ -156,6 +156,9 @@ export interface Matter {
   id: string;
   name: string;
   asset_class: string;
+  client?: string | null;
+  counterparty?: string | null;
+  jurisdiction?: string | null;
   deal_size: string;
   agents_deployed: string[];
   compliance_envelope: number;
@@ -188,6 +191,8 @@ export async function getMatters(): Promise<MattersResponse> {
 export interface MatterCreate {
   name: string;
   asset_class?: string;
+  client?: string;
+  counterparty?: string;
   deal_size?: string;
   jurisdiction?: string;
   agents_deployed?: string[];

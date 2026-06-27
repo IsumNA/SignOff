@@ -1,17 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Cpu,
-  Layers,
-  Loader2,
-  Lock,
-  ShieldAlert,
-  ShieldCheck,
-} from "lucide-react";
+import { ArrowLeft, Loader2, Lock, ShieldAlert } from "lucide-react";
 import { getAudit, getMatters, type AuditRecord, type Matter } from "@/lib/api";
 import { Brand } from "@/components/Brand";
+import {
+  DocumentFold,
+  ReviewGlass,
+  Seal,
+  SignatureLine,
+} from "@/components/icons";
 
 export const Route = createFileRoute("/audit")({
   head: () => ({
@@ -29,11 +26,11 @@ export const Route = createFileRoute("/audit")({
 
 const TYPE_META: Record<
   string,
-  { color: string; Icon: typeof CheckCircle2; label: string }
+  { color: string; Icon: typeof Seal; label: string }
 > = {
-  signoff: { color: "var(--color-success)", Icon: CheckCircle2, label: "Sign-off" },
-  analysis: { color: "var(--color-info)", Icon: Cpu, label: "Analysis" },
-  matter_planned: { color: "var(--color-warning)", Icon: Layers, label: "Planned" },
+  signoff: { color: "var(--color-foreground)", Icon: SignatureLine, label: "Sign-off" },
+  analysis: { color: "var(--color-muted-foreground)", Icon: ReviewGlass, label: "Analysis" },
+  matter_planned: { color: "var(--color-muted-foreground)", Icon: DocumentFold, label: "Planned" },
 };
 
 function AuditTrail() {
@@ -82,8 +79,10 @@ function AuditTrail() {
         <div className="mx-auto max-w-5xl px-6 py-8">
           <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h1 className="text-[22px] font-semibold tracking-[-0.01em]">Decision record</h1>
-              <p className="mt-1 max-w-2xl text-[13px] text-muted-foreground">
+              <h1 className="font-serif text-[32px] font-medium leading-tight tracking-[-0.02em]">
+                Decision record
+              </h1>
+              <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
                 Every analysis, plan and sign-off across the portfolio, written to an
                 append-only log. Each entry seals the hash of the one before it, so any
                 later edit or deletion is detectable.
@@ -93,12 +92,12 @@ function AuditTrail() {
               <span
                 className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-semibold"
                 style={{
-                  color: verified ? "var(--color-success)" : "var(--color-destructive)",
-                  backgroundColor: `color-mix(in oklab, ${verified ? "var(--color-success)" : "var(--color-destructive)"} 14%, transparent)`,
+                  color: verified ? "var(--color-foreground)" : "var(--color-destructive)",
+                  backgroundColor: `color-mix(in oklab, ${verified ? "var(--color-foreground)" : "var(--color-destructive)"} 12%, transparent)`,
                 }}
                 title="The server recomputes the SHA-256 hash chain on every read."
               >
-                {verified ? <ShieldCheck className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
+                {verified ? <Seal className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
                 {verified ? "Hash chain verified" : "Chain integrity broken"}
               </span>
             )}
@@ -113,8 +112,8 @@ function AuditTrail() {
               { label: "Matters planned", value: stats.matter_planned ?? 0 },
             ].map((s) => (
               <div key={s.label} className="rounded-xl border border-border bg-surface/40 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{s.label}</p>
-                <p className="mt-1 text-[20px] font-semibold tabular-nums">{s.value}</p>
+                <p className="text-[10.5px] uppercase tracking-[0.08em] text-muted-foreground">{s.label}</p>
+                <p className="mt-1.5 font-serif text-[26px] font-medium tabular-nums leading-none">{s.value}</p>
               </div>
             ))}
           </div>

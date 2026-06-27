@@ -1,16 +1,22 @@
 import { Link } from "@tanstack/react-router";
-import { Check, ClipboardList, Network, ScanSearch, FileSignature } from "lucide-react";
+import { Check } from "lucide-react";
+import {
+  DocumentFold,
+  ReviewGlass,
+  SignatureLine,
+  Workstreams,
+} from "@/components/icons";
 import type { MatterStage } from "@/lib/api";
 
 const STAGES: {
   id: MatterStage;
   label: string;
-  Icon: typeof ClipboardList;
+  Icon: typeof DocumentFold;
 }[] = [
-  { id: "plan", label: "Plan", Icon: ClipboardList },
-  { id: "coordinate", label: "Coordinate", Icon: Network },
-  { id: "review", label: "Review", Icon: ScanSearch },
-  { id: "signoff", label: "Sign Off", Icon: FileSignature },
+  { id: "plan", label: "Plan", Icon: DocumentFold },
+  { id: "coordinate", label: "Coordinate", Icon: Workstreams },
+  { id: "review", label: "Review", Icon: ReviewGlass },
+  { id: "signoff", label: "Sign Off", Icon: SignatureLine },
 ];
 
 const ORDER: MatterStage[] = ["plan", "coordinate", "review", "signoff"];
@@ -49,7 +55,7 @@ export function LifecycleStepper({
           state === "active"
             ? "var(--color-foreground)"
             : state === "done"
-              ? "var(--color-success)"
+              ? "var(--color-muted-foreground)"
               : "var(--color-muted-foreground)";
         const href = stageHref(s.id, matterId);
         const Icon = s.Icon;
@@ -94,7 +100,7 @@ export function LifecycleStepper({
                 style={{
                   background:
                     i < currentIdx
-                      ? "var(--color-success)"
+                      ? "var(--color-foreground)"
                       : "var(--color-border-strong)",
                 }}
               />
