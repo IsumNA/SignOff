@@ -55,6 +55,10 @@ TIER_LABEL: Dict[int, str] = {
 }
 TIER_POSTURE: Dict[int, str] = {1: "approve", 2: "amend", 3: "reject"}
 
+# Upper bound on the live synthesis (Vertex/Gemini) call. Past this we fall back
+# to the deterministic synthesis so a single review can never stall the UI.
+_SYNTH_TIMEOUT_S = 30.0
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -403,12 +407,31 @@ async def _gemini_synthesis(
     )
     parsed = json.loads((response.text or "").strip())
 
-    # Stamp the live mode onto each agent for the frontend indicator.
+    # Normalize so the result always satisfies the API schema, even when the
+    # model omits a field it deems implied — otherwise FastAPI 500s on response
+    # validation and the whole review fails. Defaults are conservative.
+    cls = parsed.setdefault("classification", {})
+    tier = int(cls.get("tier", 2) or 2)
+    cls["tier"] = tier
+    cls.setdefault("tier_label", TIER_LABEL.get(tier, "Material risk"))
+    cls.setdefault("recommended_posture", TIER_POSTURE.get(tier, "amend"))
+    cls.setdefault("escalated", tier == 3)
+    cls.setdefault("triggers", [])
+    cls.setdefault("confidence", 0.8)
+    parsed.setdefault("answer", "")
+
+    # Fill every required AgentResult field; the frontend shows these verbatim.
     for agent in parsed.get("agents", []):
+        agent.setdefault("agent", "Deal Agent")
+        agent.setdefault("model", "Gemini 2.5 Flash")
+        agent.setdefault("summary", "")
         agent.setdefault("mode", "live")
+        agent.setdefault("findings", [])
+        agent.setdefault("stance", "")
+        agent.setdefault("phase", "initial")
         agent.setdefault("assumptions", [])
         agent.setdefault("red_flags", [])
-        agent.setdefault("findings", [])
+        agent.setdefault("reasoning", agent.get("summary", ""))
     return parsed
 
 
@@ -498,8 +521,12 @@ async def run_mesh(
 
     if vertex_is_live():
         try:
-            synthesized = await _gemini_synthesis(
-                clause_text, jurisdiction, nim, graph, web, eu
+            # Bound the live call so a slow Vertex response can never hang the
+            # review (e.g. on stage). On timeout we drop to the deterministic
+            # synthesis, which is instant and grounded on the same signals.
+            synthesized = await asyncio.wait_for(
+                _gemini_synthesis(clause_text, jurisdiction, nim, graph, web, eu),
+                timeout=_SYNTH_TIMEOUT_S,
             )
         except Exception as exc:  # noqa: BLE001 — fall back to demo synthesis
             logger.exception("Gemini synthesis failed; using demo fallback")

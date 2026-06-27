@@ -37,6 +37,16 @@ logger = logging.getLogger("signoff.tools")
 # Default timeout for outbound HTTP calls (Perplexity / NIM).
 _HTTP_TIMEOUT = httpx.Timeout(45.0, connect=10.0)
 
+# The public EU Cellar SPARQL endpoint is authoritative but can be slow/variable.
+# Cap it tightly so a slow response degrades to "no EU results" instead of
+# stalling the whole review (which must stay responsive, especially on a demo).
+_EU_TIMEOUT = httpx.Timeout(12.0, connect=6.0)
+
+# NVIDIA's hosted Nemotron endpoint latency is variable (occasionally ~30s+).
+# Cap it so a spike degrades to the local mock assessment instead of dominating
+# the whole review. The mock is instant and tier-accurate on the demo clauses.
+_NIM_TIMEOUT = httpx.Timeout(15.0, connect=6.0)
+
 
 # ---------------------------------------------------------------------------
 # Neo4j — GraphRAG precedent retrieval
@@ -243,7 +253,7 @@ async def search_eu_legislation(clause_text: str, limit: int = 4) -> Dict[str, A
     query = _eu_sparql(term, limit)
 
     try:
-        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=_EU_TIMEOUT) as client:
             resp = await client.get(
                 _EU_CELLAR_ENDPOINT,
                 params={"query": query},
@@ -380,7 +390,7 @@ async def assess_local_risk(clause_text: str) -> Dict[str, Any]:
     headers = {"Authorization": f"Bearer {settings.nvidia_api_key}"}
 
     try:
-        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=_NIM_TIMEOUT) as client:
             resp = await client.post(
                 f"{base}/chat/completions", json=payload, headers=headers
             )

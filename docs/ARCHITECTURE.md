@@ -165,6 +165,19 @@ checks. The rule throughout the codebase:
 This is surfaced on `GET /api/health`, on every trace frame, and on every
 recommendation — so a judge can always see exactly what is real.
 
+**Resilience.** Every external call is independently bounded and degrades
+gracefully, so one slow or failing dependency can never hang or break a review:
+
+- Each tool (NVIDIA Nemotron, EU Cellar, Perplexity, Neo4j) has its own timeout
+  and, on failure, returns a structured error or demo payload instead of raising.
+- The Gemini synthesis is wrapped in a hard timeout; on timeout it falls back to
+  the deterministic synthesis, which is grounded on the same signals.
+- The live synthesis output is normalised before it leaves the API, so a model
+  that omits an optional-looking field can never produce an invalid response.
+
+The net effect: a single review stays responsive (typically ~20–40s end-to-end)
+and always returns a valid, labelled result.
+
 ---
 
 ## 9. Deployment

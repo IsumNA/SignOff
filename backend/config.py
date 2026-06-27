@@ -59,7 +59,7 @@ class Settings(BaseSettings):
 
     # --- Perplexity AI ---
     perplexity_api_key: str = ""
-    perplexity_model: str = "sonar-reasoning"
+    perplexity_model: str = "sonar-pro"
     perplexity_base_url: str = "https://api.perplexity.ai"
 
     # --- NVIDIA NIM / Nemotron (High-Security Risk Agent) ---

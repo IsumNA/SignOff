@@ -146,7 +146,7 @@ insights engine work.
 | Confidential risk review | **NVIDIA Nemotron** (NIM, OpenAI-compatible API) | `NVIDIA_API_KEY` present |
 | Precedent graph | **Neo4j** (async, Cypher) | Neo4j credentials present |
 | EU legislation | **EU Publications Office** (Cellar SPARQL) | **always live** — public, key-less |
-| Legal research | **Perplexity** (`sonar-reasoning`) | `PERPLEXITY_API_KEY` present |
+| Legal research | **Perplexity** (`sonar-pro`) | `PERPLEXITY_API_KEY` present |
 | Durable audit mirror | **GCP Firestore** (async) | GCP credentials present |
 | Tamper-proof audit | **SHA-256 hash chain** (local JSONL) | always |
 | Live traces | **Server-Sent Events** | always |
