@@ -1,18 +1,31 @@
-"""SignOff backend — FastAPI application.
+"""SignOff backend — FastAPI application (the HTTP surface).
 
-Serves the asymmetric legal risk mesh consumed by the SignOff (Lovable) React
-frontend, and writes a tamper-evident audit trail to Firestore. Designed to run
-on Cloud Run; runs locally in demo mode without any cloud credentials.
+This is the thin entry point: it validates requests, delegates to one focused
+module, and records the outcome to the audit trail. The real work lives in
+``mesh.py`` (review), ``insights.py`` (portfolio learning), ``audit.py`` /
+``events.py`` (record & stream), and ``matters.py`` (ledger).
 
-Endpoints (frontend contract):
-  GET  /api/health                — integration status (live/demo)
-  POST /api/chat                  — run the mesh on a clause / question
-  GET  /api/trace/{id}/stream     — live SSE stream of multi-agent tool traces
-  POST /api/signoff               — record a counsel decision to the audit trail
+Runs on Cloud Run; runs locally in demo mode with no cloud credentials.
 
-Additional:
-  GET  /                          — service metadata
-  POST /api/mesh/analyze-clause   — original mesh endpoint (same engine)
+Endpoints (kept in sync with frontend/src/lib/api.ts):
+  Portfolio & lifecycle
+    GET  /api/health                  — integration status (live/demo)
+    GET  /api/matters                 — portfolio ledger + summary
+    POST /api/matters                 — (1) Plan: register a new matter
+    GET  /api/matters/{id}/tasks      — (2) Coordinate: workstream board
+  Learning
+    GET  /api/insights                — cross-matter patterns to scrutinise
+    GET  /api/insights/plan           — proactive plan suggestion (learned)
+  Review & sign-off
+    POST /api/chat                    — (3) run the review on a clause/question
+    GET  /api/trace/{id}/stream       — live SSE stream of execution traces
+    POST /api/signoff                 — (4) record a sign-off decision
+  Auditability
+    GET  /api/audit                   — read the tamper-proof audit trail
+    GET  /api/audit/verify            — re-verify the hash chain is intact
+  Misc
+    GET  /                            — service metadata
+    POST /api/mesh/analyze-clause     — original review endpoint (same engine)
 """
 
 from __future__ import annotations

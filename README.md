@@ -1,127 +1,250 @@
-# SignOff — Asymmetric Legal Risk AI Multi-Agent Mesh
+# SignOff
 
-**SignOff** is a document-first AI legal decisioning workspace for live M&A
-transactions. It analyzes contract clauses and returns a structured **risk
-mitigation tier** (Tier 1 / 2 / 3) with per-agent reasoning, supporting
-evidence, and a tamper-evident audit trail.
+**An oversight control tower for supervising AI-assisted legal work.**
 
-This repository is a monorepo:
+Most legal-AI tools help *do* the work — drafting, summarising, first-pass
+review. SignOff is built for the people who have to **supervise and stand behind
+that work**: partners, counsel and senior associates. As AI raises output
+volume, the bottleneck shifts from *doing* to *overseeing*. SignOff gives a
+supervisor one place to plan a matter, coordinate who (and which AI) works on
+it, review the output with the AI's reasoning laid bare, and sign off — with a
+tamper-proof record of every decision.
 
-- **`backend/`** — Python FastAPI service running the multi-agent mesh.
-- **`frontend/`** — React (TanStack Start) UI, built with Lovable.
+Built with a Clifford Chance supervision workflow in mind.
 
-The backend fans out three *asymmetric* agents in parallel, then fuses their
-signals in **Gemini 2.5 Flash** to produce a strict-JSON verdict.
+---
+
+## Contents
+
+- [The supervision lifecycle](#the-supervision-lifecycle)
+- [What it does](#what-it-does)
+- [Architecture](#architecture)
+- [Tech stack & live-vs-demo](#tech-stack--live-vs-demo)
+- [Quickstart](#quickstart)
+- [Repository map](#repository-map)
+- [API reference](#api-reference)
+- [How it maps to the judging criteria](#how-it-maps-to-the-judging-criteria)
+- [Honest limitations](#honest-limitations)
+
+---
+
+## The supervision lifecycle
+
+The whole product is organised around the four stages a supervisor actually
+moves through. Each stage is a screen.
+
+```
+   (1) PLAN    ──►   (2) COORDINATE   ──►   (3) REVIEW    ──►   (4) SIGN OFF
+   Set the risk      Track who/what          Read the AI's        Approve / amend /
+   limits & pick     works each              findings, reasoning  reject, with the
+   AI reviewers      workstream              & evidence           decision recorded
+```
+
+| Stage | Screen | What the supervisor does |
+| --- | --- | --- |
+| **1. Plan** | `/plan` | Define a new matter's risk limits, scope and red-lines, and choose its AI reviewers. The app **proactively suggests** a setup learned from comparable matters. |
+| **2. Coordinate** | `/coordinate/:id` | A kanban board showing each workstream moving across the review pipeline. |
+| **3. Review** | `/matter/:id` | The clause workspace: each clause gets a risk tier, the AI's reasoning, supporting evidence, a live confidence signal, and live execution traces. |
+| **4. Sign off** | `/matter/:id` | Approve, amend or reject — capturing any **override** of the AI and writing a tamper-proof audit record. |
+| **Portfolio** | `/` | The ledger: every matter, its stage, and a "what to scrutinise" insights panel across the whole portfolio. |
+| **Audit** | `/audit` | The portfolio-wide, verifiable decision record. |
+
+---
+
+## What it does
+
+The brief named four things a good supervision tool must do. SignOff implements
+all four, plus a learning layer.
+
+- **Supervisory controls** — explicit approve / amend / reject, an **override**
+  flag captured whenever the supervisor departs from the AI's recommendation,
+  and configurable risk limits and escalation tiers per matter.
+- **Risk signalling** — every clause is rated Tier 1 (routine) / 2 (material) /
+  3 (escalate), with a **confidence meter** and an explicit warning when the AI
+  is uncertain, so a human looks harder exactly where it matters.
+- **Transparency** — the multi-agent review streams **live execution traces**
+  (which model/source ran, live or demo, how long it took) to the screen as it
+  happens, and every recommendation shows its sources and per-reviewer reasoning.
+- **Auditability** — every analysis, plan and sign-off is written to an
+  append-only, **SHA-256 hash-chained** record that is re-verified on every read,
+  so any later edit or deletion is provable.
+- **Portfolio learning** *(the "gets better over time" part)* — the system reads
+  the whole portfolio to (a) surface cross-matter patterns a partner should
+  scrutinise, and (b) **proactively suggest how to plan a new matter** based on
+  comparable past matters. Suggestions sharpen as more matters are added.
+
+---
 
 ## Architecture
 
-```
-                       ┌────────────────────────────────────────────┐
-  frontend/ (React) ─► │  FastAPI  /api/chat                         │
-                       │                                            │
-                       │   asyncio.gather (asymmetric fan-out):     │
-                       │     • NIM local agent  (sensitive, on-prem)│
-                       │     • Neo4j GraphRAG   (precedents)        │
-                       │     • Perplexity       (live web research) │
-                       │                  │                         │
-                       │                  ▼                         │
-                       │     Gemini 2.5 Flash  (strict JSON verdict)│
-                       │                  │                         │
-                       │                  ▼                         │
-                       │     Firestore audit trail                  │
-                       └────────────────────────────────────────────┘
-```
+A React (TanStack Start) frontend talks to a Python FastAPI backend. For a
+clause review, the backend fans out several specialist models/sources **in
+parallel**, then fuses their signals into a single risk verdict — streaming each
+step to the UI and recording the outcome to the audit trail.
 
-## Tech stack
+```mermaid
+flowchart TD
+    UI["Frontend (React / TanStack Start)<br/>Plan · Coordinate · Review · Sign-off · Audit"]
+    API["FastAPI backend"]
 
-| Layer            | Technology                                   |
-| ---------------- | -------------------------------------------- |
-| Frontend         | **React 19 + TanStack Start**, Tailwind, shadcn/ui |
-| API              | Python **FastAPI** (async)                   |
-| Core model       | **Vertex AI — Gemini 2.5 Flash** (strict JSON) |
-| High-security    | **NVIDIA NIM** agent (local mock)            |
-| Graph / GraphRAG | **Neo4j** (async driver, Cypher)             |
-| State / audit    | **GCP Firestore** (async client)             |
-| Web grounding    | **Perplexity** (`sonar-reasoning`)           |
+    UI -->|"POST /api/chat"| API
+    UI -.->|"GET /api/trace/:id/stream (SSE, live)"| API
 
-## Project layout
+    subgraph FANOUT["Parallel review (asyncio.gather)"]
+        NIM["NVIDIA Nemotron<br/>confidential risk review"]
+        NEO["Neo4j<br/>precedent graph"]
+        EU["EU Publications Office<br/>live EU legislation (SPARQL)"]
+        PPLX["Perplexity<br/>live legal research"]
+    end
 
-```
-SignOff/
-├── README.md
-├── .gitignore
-├── backend/                 # FastAPI multi-agent service
-│   ├── requirements.txt
-│   ├── .env.example         # copy to .env and fill in
-│   ├── Dockerfile           # Cloud Run image
-│   ├── .dockerignore
-│   ├── config.py            # Settings + lazy clients (Vertex AI, Firestore, Neo4j)
-│   ├── tools.py             # Async tools: Neo4j Cypher, Perplexity, NIM (local mock)
-│   ├── mesh.py              # Asymmetric multi-agent pipeline + Gemini synthesis
-│   └── main.py              # FastAPI app, CORS, /api/health · /api/chat · /api/signoff
-└── frontend/                # React UI (Lovable)
-    ├── package.json
-    ├── .env                 # VITE_API_BASE -> backend URL
-    └── src/
+    API --> FANOUT
+    FANOUT --> SYNTH["Gemini 2.5 Flash<br/>fuse signals → risk tier (strict JSON)"]
+    SYNTH --> RESULT["Verdict: tier · reasoning · evidence · confidence"]
+    RESULT --> UI
+
+    API -->|"every decision"| AUDIT["Hash-chained audit trail<br/>(local JSONL + Firestore mirror)"]
+    API --> INS["Insights engine<br/>portfolio scrutiny + plan suggestions"]
+    INS --> UI
 ```
 
-## Backend
+Two design choices worth calling out:
 
-### Setup
+1. **Honest by construction.** Every signal is labelled **Live** or **Demo** in
+   the UI. The app runs fully end-to-end with zero credentials (demo mode), and
+   each integration flips to live when its key is present — nothing is faked as
+   live.
+2. **Graceful degradation.** If any single reviewer fails, it returns a
+   structured error instead of crashing; the review still produces a best-effort
+   verdict.
+
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the file-by-file
+breakdown, the request lifecycle, and how the hash chain, SSE streaming, and
+insights engine work.
+
+---
+
+## Tech stack & live-vs-demo
+
+| Capability | Technology | Live when… |
+| --- | --- | --- |
+| Frontend | React 19 + **TanStack Start**, Tailwind, shadcn/ui | always |
+| API | Python **FastAPI** (async) | always |
+| Synthesis / reasoning | **Vertex AI — Gemini 2.5 Flash** (strict JSON) | GCP credentials present |
+| Confidential risk review | **NVIDIA Nemotron** (NIM, OpenAI-compatible API) | `NVIDIA_API_KEY` present |
+| Precedent graph | **Neo4j** (async, Cypher) | Neo4j credentials present |
+| EU legislation | **EU Publications Office** (Cellar SPARQL) | **always live** — public, key-less |
+| Legal research | **Perplexity** (`sonar-reasoning`) | `PERPLEXITY_API_KEY` present |
+| Durable audit mirror | **GCP Firestore** (async) | GCP credentials present |
+| Tamper-proof audit | **SHA-256 hash chain** (local JSONL) | always |
+| Live traces | **Server-Sent Events** | always |
+
+Check what's live at any time: `GET /api/health`.
+
+---
+
+## Quickstart
+
+The app runs with **no credentials** in demo mode. Backend on `:8000`,
+frontend on `:8080`.
+
+### Backend
 
 ```bash
 cd backend
 python -m venv .venv
 # Windows:  .venv\Scripts\activate
-# Unix:     source .venv/bin/activate
+# macOS/Linux:  source .venv/bin/activate
 
 pip install -r requirements.txt
-cp .env.example .env   # then fill in real values
+cp .env.example .env          # optional: fill in keys to go live
+python main.py                # http://localhost:8000  (docs at /docs)
 ```
 
-For live Vertex AI + Firestore (local dev), authenticate with ADC:
+To enable live Google Cloud (Gemini + Firestore) for local dev:
 
 ```bash
 gcloud auth application-default login
 ```
 
-### Run
+> **Keys go in `.env`, never in `.env.example`.** `.env` is gitignored;
+> `.env.example` is a committed template. The backend reads `.env` from both
+> `backend/` and the repo root.
+
+### Frontend
 
 ```bash
-cd backend
-python main.py            # binds 0.0.0.0:8000 for local dev
-# or:  uvicorn main:app --reload --host 0.0.0.0 --port 8000
+cd frontend
+npm install        # or: bun install
+npm run dev        # http://localhost:8080
 ```
 
-Interactive docs: http://localhost:8000/docs
+The frontend points at the backend via `frontend/.env` →
+`VITE_API_BASE=http://localhost:8000`.
 
-> Local dev uses port **8000** for the backend because the frontend dev server
-> runs on **8080**. On Cloud Run the container listens on the injected `PORT`.
+---
 
-> The backend runs in **demo mode** out of the box — no GCP, Neo4j, or
-> Perplexity credentials required. Each integration flips to **live** when its
-> credentials are present in `.env` (see `GET /api/health`).
+## Repository map
 
-### Deploy (Cloud Run)
-
-```bash
-cd backend
-gcloud run deploy signoff-backend --source . --region us-central1 --allow-unauthenticated
+```
+SignOff/
+├── README.md                      ← you are here (start)
+├── docs/
+│   └── ARCHITECTURE.md            ← deep dive: request flow, audit chain, SSE, insights
+│
+├── backend/                       ← FastAPI service (the review engine)
+│   ├── main.py                    ← app + all HTTP routes (the API surface)
+│   ├── mesh.py                    ← parallel multi-agent review + Gemini synthesis
+│   ├── tools.py                   ← the individual reviewers (Nemotron, Neo4j, EU, Perplexity)
+│   ├── insights.py                ← portfolio learning: scrutiny patterns + plan suggestions
+│   ├── audit.py                   ← tamper-proof hash-chained audit log
+│   ├── events.py                  ← in-process event bus for live SSE traces
+│   ├── matters.py                 ← the matter ledger + lifecycle (demo data)
+│   ├── config.py                  ← settings + lazy clients + live/demo detection
+│   ├── requirements.txt
+│   ├── .env.example               ← config template (copy to .env)
+│   └── Dockerfile                 ← Cloud Run image
+│
+└── frontend/                      ← React UI (TanStack Start)
+    └── src/
+        ├── routes/                ← one file per screen (file-based routing)
+        │   ├── index.tsx          ← (1) Portfolio ledger + insights
+        │   ├── plan.tsx           ← (1) Plan a matter + proactive suggestions
+        │   ├── coordinate/$matterId.tsx  ← (2) Coordinate kanban
+        │   ├── matter/$matterId.tsx      ← (3,4) Review workspace + sign-off
+        │   ├── audit.tsx          ← portfolio audit trail
+        │   ├── profile.tsx        ← account + settings (incl. light/dark)
+        │   └── __root.tsx         ← app shell
+        ├── components/
+        │   ├── Brand.tsx          ← the logo/wordmark (theme-adaptive)
+        │   ├── Lifecycle.tsx      ← the 4-stage stepper
+        │   ├── icons.tsx          ← custom legal iconography
+        │   └── ui/                ← shadcn/ui primitives
+        └── lib/
+            ├── api.ts             ← typed client — the single source of the API contract
+            └── theme.ts           ← light/dark theme handling
 ```
 
-### API (frontend contract)
+---
 
-The endpoints match `frontend/src/lib/api.ts`:
+## API reference
 
-| Method | Path                       | Purpose                                  |
-| ------ | -------------------------- | ---------------------------------------- |
-| GET    | `/api/health`              | Integration status (`live` / `demo`)     |
-| GET    | `/api/matters`             | Multi-matter risk ledger + portfolio summary |
-| POST   | `/api/chat`                | Run the mesh on a clause / question      |
-| POST   | `/api/signoff`             | Record a counsel decision (audit trail)  |
-| POST   | `/api/mesh/analyze-clause` | Original mesh endpoint (same engine)     |
+Matches `frontend/src/lib/api.ts`. Interactive docs at `/docs`.
 
-Example:
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/api/health` | Integration status (`live` / `demo`) |
+| GET | `/api/matters` | Portfolio ledger + summary |
+| POST | `/api/matters` | Plan stage — register a new matter |
+| GET | `/api/matters/{id}/tasks` | Coordinate board for one matter |
+| GET | `/api/insights` | Cross-matter patterns to scrutinise |
+| GET | `/api/insights/plan` | Proactive plan suggestion for a practice area |
+| POST | `/api/chat` | Run the review on a clause / question |
+| GET | `/api/trace/{session_id}/stream` | Live execution traces (SSE) |
+| POST | `/api/signoff` | Record a sign-off decision (audit trail) |
+| GET | `/api/audit` | Read the audit trail (optionally per matter) |
+| GET | `/api/audit/verify` | Re-verify the hash chain is intact |
+
+Example review:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/chat \
@@ -132,35 +255,34 @@ curl -X POST http://127.0.0.1:8000/api/chat \
   }'
 ```
 
-Returns a `classification` (Tier 1/2/3), per-agent `agents[]` reasoning,
-supporting `evidence[]`, and tool-call `traces[]`.
+Returns a `classification` (tier + recommended posture + confidence), per-reviewer
+`agents[]` reasoning, supporting `evidence[]`, and `traces[]`. **Tier
+convention:** 1 = routine (approve), 2 = material (amend), 3 = escalate (reject).
 
-**Tier convention** (matches the UI): Tier 1 = Routine (approve), Tier 2 =
-Material risk (amend), Tier 3 = Escalation required (reject).
+---
 
-## Frontend
+## How it maps to the judging criteria
 
-Point the React app at the backend via `frontend/.env`:
+| Criterion | Where to look |
+| --- | --- |
+| **Solution** | The four-stage lifecycle (`/plan` → `/coordinate` → `/matter` → sign-off) implements the exact supervision brief, end to end. |
+| **Technology** | Parallel multi-model review (`mesh.py`), live key-less EU legislation (`tools.py`), live SSE traces (`events.py`), hash-chained audit (`audit.py`). |
+| **Transformation** | Built for oversight at portfolio scale — the ledger + insights engine (`insights.py`), not single-document tooling. |
+| **Rigour / Impact** | Honest live/demo labelling, verifiable audit (`/api/audit/verify`), and confidence/uncertainty signalling on every recommendation. |
+| **Investment** | A sharp buyer (supervising partners) and a pain that grows with AI adoption; personalised to a real firm's workflow. |
+| **Overall** | Restrained, intentional design (custom legal iconography, serif/mono typography, light/dark), lawyer-friendly language throughout. |
 
-```
-VITE_API_BASE=http://localhost:8000
-```
+---
 
-Then run the dev server (Lovable's config serves it on `:8080`, which the
-backend CORS allows):
+## Honest limitations
 
-```bash
-cd frontend
-npm install   # or: bun install
-npm run dev   # or: bun dev   ->  http://localhost:8080
-```
+In keeping with the rigour the brief asks for:
 
-## Notes
-
-- **NIM mock**: `NIM_MOCK=true` runs a local deterministic heuristic representing
-  on-prem processing of sensitive clauses. Set `NIM_MOCK=false` and point
-  `NIM_BASE_URL` at a live NIM container to use real inference.
-- **Graceful degradation**: a failure in any single agent returns a structured
-  `error` payload instead of crashing; the mesh still produces a best-effort verdict.
-- **CORS**: configured for the frontend via `CORS_ALLOW_ORIGINS` plus a regex
-  allowing `*.lovable.app` / `*.lovable.dev`.
+- The matter **ledger is illustrative demo data** — clients/counterparties are
+  well-known public companies used purely as realistic placeholders.
+- The AI risk findings have **not yet been benchmarked** against a lawyer's
+  ground-truth labels; accuracy evaluation is the clearest next step.
+- Portfolio learning currently derives from portfolio configuration and the
+  audit trail; it is a transparent heuristic, not a trained model.
+- "Live" vs "Demo" reflects exactly what is configured at runtime — see
+  `/api/health`.
