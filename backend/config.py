@@ -13,12 +13,24 @@ from __future__ import annotations
 
 import logging
 from functools import lru_cache
+from pathlib import Path
 from typing import List
 
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-load_dotenv()
+# Resolve .env locations independent of the current working directory, so the
+# backend picks up config whether it's launched from backend/ or the repo root,
+# and whether the .env lives alongside the code or at the monorepo root.
+_BACKEND_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _BACKEND_DIR.parent
+_ENV_FILES = (_REPO_ROOT / ".env", _BACKEND_DIR / ".env")
+
+# Populate os.environ too (Google client libraries read it directly, e.g.
+# GOOGLE_APPLICATION_CREDENTIALS). Backend/.env wins over the repo-root one.
+for _env_path in _ENV_FILES:
+    if _env_path.exists():
+        load_dotenv(_env_path, override=True)
 
 logger = logging.getLogger("signoff.config")
 
@@ -27,7 +39,7 @@ class Settings(BaseSettings):
     """Strongly-typed application settings sourced from the environment / .env."""
 
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+        env_file=_ENV_FILES, env_file_encoding="utf-8", extra="ignore"
     )
 
     # --- Google Cloud / Vertex AI ---
