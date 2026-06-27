@@ -334,6 +334,10 @@ def _mock_nim_assessment(clause_text: str) -> Dict[str, Any]:
 
 
 _NIM_SYSTEM = (
+    # NVIDIA Nemotron control token: disable the model's reasoning trace so it
+    # answers directly with JSON instead of spending the token budget "thinking"
+    # (which truncated the verdict and forced a mock fallback).
+    "detailed thinking off\n\n"
     "You are a high-security legal risk classifier for contract clauses. "
     "Assess the clause for risk to the party engaging you. Respond with a SINGLE "
     "JSON object and nothing else, matching this schema:\n"
@@ -341,7 +345,8 @@ _NIM_SYSTEM = (
     '"flagged_terms": string[], '
     '"rationale": string}\n'
     "flagged_terms must quote the exact risky phrases from the clause. Keep "
-    "rationale to one or two sentences."
+    "rationale to one or two sentences. Do not include any text before or after "
+    "the JSON object."
 )
 
 
@@ -397,7 +402,10 @@ async def assess_local_risk(clause_text: str) -> Dict[str, Any]:
             resp.raise_for_status()
             data = resp.json()
 
-        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        msg = data.get("choices", [{}])[0].get("message", {}) or {}
+        # Reasoning models may leave `content` empty and put the answer (with the
+        # JSON) in `reasoning_content`; check both.
+        content = msg.get("content") or msg.get("reasoning_content") or ""
         parsed = _parse_nim_json(content)
         if not parsed:
             raise ValueError("NIM returned no parseable JSON verdict")

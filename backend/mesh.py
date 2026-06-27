@@ -57,7 +57,7 @@ TIER_POSTURE: Dict[int, str] = {1: "approve", 2: "amend", 3: "reject"}
 
 # Upper bound on the live synthesis (Vertex/Gemini) call. Past this we fall back
 # to the deterministic synthesis so a single review can never stall the UI.
-_SYNTH_TIMEOUT_S = 30.0
+_SYNTH_TIMEOUT_S = 40.0
 
 
 def _now() -> str:
@@ -388,13 +388,28 @@ async def _gemini_synthesis(
     from vertexai.generative_models import GenerationConfig
 
     model = get_gemini_model()
+
+    # Trim the grounding payloads before handing them to Gemini. The live tools
+    # (esp. Perplexity) can return large blobs; an oversized prompt slows the
+    # synthesis enough to trip its timeout. Trimming keeps the call fast and live
+    # without changing what the tools return to the frontend.
+    web_compact = {
+        "source": web.get("source"),
+        "analysis": (web.get("analysis") or "")[:1200],
+        "citations": (web.get("citations") or [])[:5],
+    }
+    eu_compact = {
+        "source": eu.get("source"),
+        "results": (eu.get("results") or [])[:3],
+    }
+
     prompt = (
         f"JURISDICTION: {jurisdiction}\n\n"
         f"CLAUSE UNDER REVIEW:\n{clause_text}\n\n"
         f"=== NIM_LOCAL_ASSESSMENT ===\n{json.dumps(nim, ensure_ascii=False)}\n\n"
         f"=== GRAPH_PRECEDENTS ===\n{json.dumps(graph, ensure_ascii=False)}\n\n"
-        f"=== EU_LEGISLATION (live, authoritative) ===\n{json.dumps(eu, ensure_ascii=False)}\n\n"
-        f"=== WEB_RESEARCH ===\n{json.dumps(web, ensure_ascii=False)}\n\n"
+        f"=== EU_LEGISLATION (live, authoritative) ===\n{json.dumps(eu_compact, ensure_ascii=False)}\n\n"
+        f"=== WEB_RESEARCH ===\n{json.dumps(web_compact, ensure_ascii=False)}\n\n"
         "Produce the risk JSON now."
     )
 
