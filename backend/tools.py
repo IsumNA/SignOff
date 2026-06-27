@@ -21,7 +21,7 @@ from typing import Any, Dict, List
 
 import httpx
 
-from config import get_neo4j_driver, get_settings
+from config import get_neo4j_driver, get_settings, neo4j_is_live
 
 logger = logging.getLogger("signoff.tools")
 
@@ -61,6 +61,15 @@ async def query_precedents(
     Returns a structured dict the LLM can ground on. On failure it returns a
     payload with an ``error`` key rather than raising, so the mesh keeps going.
     """
+    if not neo4j_is_live():
+        logger.info("Neo4j not configured; skipping graph query (demo mode)")
+        return {
+            "source": "neo4j",
+            "clause_type": clause_type,
+            "precedents": [],
+            "mode": "demo",
+        }
+
     driver = get_neo4j_driver()
     settings = get_settings()
 
@@ -102,12 +111,12 @@ async def research_clause(clause_text: str, jurisdiction: str = "EU") -> Dict[st
     settings = get_settings()
 
     if not settings.perplexity_api_key:
-        logger.warning("Perplexity API key not configured; skipping live research")
+        logger.info("Perplexity not configured; skipping live research (demo mode)")
         return {
             "source": "perplexity",
             "analysis": "",
             "citations": [],
-            "error": "PERPLEXITY_API_KEY not configured",
+            "mode": "demo",
         }
 
     system_prompt = (

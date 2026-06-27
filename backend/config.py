@@ -55,7 +55,12 @@ class Settings(BaseSettings):
     nim_mock: bool = True
 
     # --- CORS ---
-    cors_allow_origins: str = "http://localhost:5173,http://localhost:3000"
+    # Lovable's dev server defaults to :8080; Vite's default is :5173. Both
+    # (plus an :8081 fallback) are allowed so local dev works out of the box.
+    cors_allow_origins: str = (
+        "http://localhost:8080,http://localhost:8081,"
+        "http://localhost:5173,http://localhost:3000"
+    )
 
     @property
     def cors_origins_list(self) -> List[str]:
@@ -67,6 +72,64 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Return a cached Settings instance."""
     return Settings()
+
+
+# ---------------------------------------------------------------------------
+# Integration status — drives the frontend "live vs demo" indicator and lets
+# the mesh gracefully fall back to a deterministic demo when creds are absent.
+# ---------------------------------------------------------------------------
+_PLACEHOLDER_TOKENS = ("your-", "changeme", "")
+
+
+def _looks_configured(value: str) -> bool:
+    v = (value or "").strip().lower()
+    return bool(v) and not any(v.startswith(p) for p in _PLACEHOLDER_TOKENS if p)
+
+
+def vertex_is_live() -> bool:
+    """True when Vertex AI has a real (non-placeholder) project configured."""
+    return _looks_configured(get_settings().gcp_project_id)
+
+
+def neo4j_is_live() -> bool:
+    """True when Neo4j points at a non-local instance with a real password."""
+    s = get_settings()
+    return (
+        _looks_configured(s.neo4j_uri)
+        and "localhost" not in s.neo4j_uri
+        and _looks_configured(s.neo4j_password)
+        and s.neo4j_password != "neo4j"
+    )
+
+
+def perplexity_is_live() -> bool:
+    """True when a Perplexity API key is configured."""
+    return _looks_configured(get_settings().perplexity_api_key)
+
+
+def nim_is_live() -> bool:
+    """True when the NIM agent is wired to a real container (not the mock)."""
+    return not get_settings().nim_mock
+
+
+def firestore_is_live() -> bool:
+    """True when Firestore has a real project to write the audit trail to."""
+    return vertex_is_live()
+
+
+def integration_status() -> dict:
+    """Map of integration -> 'live' | 'demo' for the health endpoint."""
+
+    def mode(flag: bool) -> str:
+        return "live" if flag else "demo"
+
+    return {
+        "vertex_ai": mode(vertex_is_live()),
+        "nvidia_nim": mode(nim_is_live()),
+        "neo4j": mode(neo4j_is_live()),
+        "perplexity": mode(perplexity_is_live()),
+        "firestore": mode(firestore_is_live()),
+    }
 
 
 # ---------------------------------------------------------------------------

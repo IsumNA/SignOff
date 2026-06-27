@@ -1,27 +1,31 @@
-# Secrets / environment
+# --- Secrets (safety net; each package also ignores its own) ---
 .env
 *.key
 *.pem
 service-account*.json
 gcp-credentials*.json
 
-# Python
+# --- Python ---
 __pycache__/
 *.py[cod]
-*.egg-info/
-.eggs/
 .venv/
 venv/
-env/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 
-# OS / editor
+# --- Node / frontend ---
+node_modules/
+dist/
+.output/
+.nitro/
+.tanstack/
+
+# --- OS / editor ---
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
 
-# Logs
+# --- Logs ---
 *.log

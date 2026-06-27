@@ -1,30 +1,40 @@
 """SignOff backend — FastAPI application.
 
-Serves the asymmetric legal risk mesh and writes a tamper-evident audit trail
-to Firestore for every analysis. Designed to run on Cloud Run behind the
-Lovable React frontend.
+Serves the asymmetric legal risk mesh consumed by the SignOff (Lovable) React
+frontend, and writes a tamper-evident audit trail to Firestore. Designed to run
+on Cloud Run; runs locally in demo mode without any cloud credentials.
 
-Endpoints:
+Endpoints (frontend contract):
+  GET  /api/health                — integration status (live/demo)
+  POST /api/chat                  — run the mesh on a clause / question
+  POST /api/signoff               — record a counsel decision to the audit trail
+
+Additional:
   GET  /                          — service metadata
-  GET  /healthz                   — liveness probe
-  POST /api/mesh/analyze-clause   — run the multi-agent mesh on one clause
+  POST /api/mesh/analyze-clause   — original mesh endpoint (same engine)
 """
 
 from __future__ import annotations
 
 import logging
-import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from config import close_neo4j_driver, get_firestore_client, get_settings
-from mesh import analyze_clause
+from config import (
+    close_neo4j_driver,
+    firestore_is_live,
+    get_firestore_client,
+    get_settings,
+    integration_status,
+)
+from matters import list_matters
+from mesh import run_mesh
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,40 +44,140 @@ logger = logging.getLogger("signoff.main")
 
 
 # ---------------------------------------------------------------------------
-# Request / response models
+# Models — mirror src/lib/api.ts on the frontend
 # ---------------------------------------------------------------------------
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    session_id: str = Field(..., min_length=1)
+    jurisdiction: str = "EU"
+    clause_type: str = ""
+
+
+class Classification(BaseModel):
+    tier: int
+    tier_label: str
+    escalated: bool
+    triggers: List[str]
+    recommended_posture: str
+    confidence: float
+
+
+class AgentResult(BaseModel):
+    agent: str
+    model: str
+    summary: str
+    mode: str
+    findings: List[str]
+    stance: str
+    phase: str
+    assumptions: List[str]
+    red_flags: List[str]
+    reasoning: str
+
+
+class EvidenceItem(BaseModel):
+    kind: str
+    title: str
+    source: str
+    detail: str
+    url: str
+
+
+class Trace(BaseModel):
+    id: str
+    session_id: str
+    agent: str
+    tool: str
+    status: str
+    detail: str
+    mode: str
+    started_at: str
+    finished_at: Optional[str] = None
+    payload: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ChatResponse(BaseModel):
+    session_id: str
+    answer: str
+    classification: Classification
+    agents: List[AgentResult]
+    evidence: List[EvidenceItem]
+    traces: List[Trace]
+    created_at: str
+
+
+class HealthResponse(BaseModel):
+    status: str
+    integrations: Dict[str, str]
+
+
+class MatterBlocker(BaseModel):
+    count: int
+    tier: int
+    label: str
+
+
+class Matter(BaseModel):
+    id: str
+    name: str
+    asset_class: str
+    deal_size: str
+    agents_deployed: List[str]
+    compliance_envelope: int
+    blockers: MatterBlocker
+    status: str
+    action: str
+
+
+class LedgerSummary(BaseModel):
+    total_matters: int
+    total_blockers: int
+    avg_envelope: int
+    ready_to_sign: int
+
+
+class MattersResponse(BaseModel):
+    matters: List[Matter]
+    summary: LedgerSummary
+
+
+class SignOffRequest(BaseModel):
+    session_id: str = Field(..., min_length=1)
+    posture: str
+    rationale: str = Field(..., min_length=1)
+    tier: int
+    author: str = "Lead Counsel"
+
+
+class SignOffRecord(BaseModel):
+    id: str
+    session_id: str
+    posture: str
+    rationale: str
+    tier: int
+    author: str
+    signed_at: str
+
+
 class AnalyzeClauseRequest(BaseModel):
-    """Incoming payload from the Lovable frontend."""
-
-    clause_text: str = Field(..., min_length=1, description="The clause to analyze.")
-    jurisdiction: str = Field("EU", description="Governing-law jurisdiction.")
-    clause_type: str = Field(
-        "", description="Optional clause type hint (e.g. 'indemnification')."
-    )
-    deal_id: Optional[str] = Field(
-        None, description="Optional deal identifier for audit correlation."
-    )
-    session_id: Optional[str] = Field(
-        None, description="Optional client session id for audit correlation."
-    )
-
-
-class AnalyzeClauseResponse(BaseModel):
-    """Structured mesh verdict returned to the frontend."""
-
-    request_id: str
-    risk_tier: str
-    verdict: Dict[str, Any]
-    latency_ms: int
+    clause_text: str = Field(..., min_length=1)
+    jurisdiction: str = "EU"
+    clause_type: str = ""
+    deal_id: Optional[str] = None
+    session_id: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
-# Lifespan — warm clients on startup, close drivers on shutdown
+# Lifespan
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    logger.info("SignOff backend starting (project=%s)", settings.gcp_project_id)
+    logger.info(
+        "SignOff backend starting (project=%s, integrations=%s)",
+        settings.gcp_project_id,
+        integration_status(),
+    )
     yield
     await close_neo4j_driver()
     logger.info("SignOff backend shut down cleanly")
@@ -79,12 +189,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — accept traffic from the Lovable React frontend.
 _settings = get_settings()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_settings.cors_origins_list,
-    allow_origin_regex=r"https://.*\.lovable\.app",
+    allow_origin_regex=r"https://.*\.lovable\.(app|dev)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -96,13 +205,17 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 async def _write_audit_log(entry: Dict[str, Any]) -> None:
     """Persist an audit record to Firestore. Never raises into the request."""
+    if not firestore_is_live():
+        logger.info("Firestore in demo mode; skipping audit write (id=%s)", entry.get("id"))
+        return
     try:
         client = get_firestore_client()
         collection = get_settings().firestore_audit_collection
-        await client.collection(collection).document(entry["request_id"]).set(entry)
-        logger.info("Audit log written (request_id=%s)", entry["request_id"])
+        doc_id = entry.get("id") or entry.get("request_id") or str(uuid.uuid4())
+        await client.collection(collection).document(doc_id).set(entry)
+        logger.info("Audit log written (id=%s)", doc_id)
     except Exception:  # noqa: BLE001 — auditing must not break the response
-        logger.exception("Failed to write audit log (request_id=%s)", entry.get("request_id"))
+        logger.exception("Failed to write audit log (id=%s)", entry.get("id"))
 
 
 # ---------------------------------------------------------------------------
@@ -114,102 +227,109 @@ async def root() -> Dict[str, Any]:
         "service": "SignOff Asymmetric Legal Risk Mesh",
         "status": "ok",
         "model": get_settings().vertex_model,
-        "endpoint": "/api/mesh/analyze-clause",
+        "endpoints": ["/api/health", "/api/chat", "/api/signoff"],
     }
 
 
-@app.get("/healthz")
-async def healthz() -> Dict[str, str]:
-    return {"status": "healthy"}
+@app.get("/api/health", response_model=HealthResponse)
+async def health() -> HealthResponse:
+    integrations = integration_status()
+    return HealthResponse(status="ok", integrations=integrations)
 
 
-@app.post("/api/mesh/analyze-clause", response_model=AnalyzeClauseResponse)
-async def analyze_clause_endpoint(
-    payload: AnalyzeClauseRequest,
-) -> AnalyzeClauseResponse:
-    """Run the asymmetric multi-agent mesh and persist an audit record."""
-    request_id = str(uuid.uuid4())
-    started = time.perf_counter()
-    started_at = datetime.now(timezone.utc).isoformat()
+@app.get("/api/matters", response_model=MattersResponse)
+async def matters() -> MattersResponse:
+    """Multi-matter risk ledger — the partner's portfolio command center."""
+    return MattersResponse(**list_matters())
 
-    logger.info(
-        "analyze-clause received (request_id=%s, deal_id=%s, jurisdiction=%s)",
-        request_id,
-        payload.deal_id,
-        payload.jurisdiction,
-    )
 
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat(payload: ChatRequest) -> ChatResponse:
+    """Run the asymmetric mesh on a clause / question and audit the result."""
     try:
-        verdict = await analyze_clause(
-            clause_text=payload.clause_text,
+        result = await run_mesh(
+            message=payload.message,
+            session_id=payload.session_id,
             jurisdiction=payload.jurisdiction,
             clause_type=payload.clause_type,
         )
-    except ValueError as exc:
-        # Synthesizer produced invalid JSON — treat as upstream/model error.
-        logger.exception("Mesh synthesis error (request_id=%s)", request_id)
-        await _write_audit_log(
-            {
-                "request_id": request_id,
-                "status": "error",
-                "error": str(exc),
-                "started_at": started_at,
-                "deal_id": payload.deal_id,
-                "session_id": payload.session_id,
-                "jurisdiction": payload.jurisdiction,
-            }
-        )
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="The risk synthesizer returned an invalid response.",
-        ) from exc
     except Exception as exc:  # noqa: BLE001 — top-level API safety net
-        logger.exception("Unexpected mesh failure (request_id=%s)", request_id)
-        await _write_audit_log(
-            {
-                "request_id": request_id,
-                "status": "error",
-                "error": str(exc),
-                "started_at": started_at,
-                "deal_id": payload.deal_id,
-                "session_id": payload.session_id,
-                "jurisdiction": payload.jurisdiction,
-            }
-        )
+        logger.exception("Mesh failure (session=%s)", payload.session_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal error while analyzing the clause.",
         ) from exc
 
-    latency_ms = int((time.perf_counter() - started) * 1000)
-    risk_tier = verdict.get("risk_tier", "Tier 2")
-
-    # Persist the audit trail (signals included for traceability).
     await _write_audit_log(
         {
-            "request_id": request_id,
-            "status": "success",
-            "started_at": started_at,
-            "completed_at": datetime.now(timezone.utc).isoformat(),
-            "latency_ms": latency_ms,
-            "deal_id": payload.deal_id,
+            "id": str(uuid.uuid4()),
+            "type": "analysis",
             "session_id": payload.session_id,
             "jurisdiction": payload.jurisdiction,
-            "clause_type": payload.clause_type,
-            "risk_tier": risk_tier,
-            "verdict": verdict,
+            "tier": result["classification"]["tier"],
+            "recommended_posture": result["classification"]["recommended_posture"],
+            "created_at": result["created_at"],
         }
     )
 
-    return AnalyzeClauseResponse(
-        request_id=request_id,
-        risk_tier=risk_tier,
-        verdict=verdict,
-        latency_ms=latency_ms,
+    return ChatResponse(**result)
+
+
+@app.post("/api/signoff", response_model=SignOffRecord)
+async def signoff(payload: SignOffRequest) -> SignOffRecord:
+    """Record a counsel decision in the tamper-evident audit trail."""
+    record = SignOffRecord(
+        id=str(uuid.uuid4()),
+        session_id=payload.session_id,
+        posture=payload.posture,
+        rationale=payload.rationale,
+        tier=payload.tier,
+        author=payload.author,
+        signed_at=datetime.now(timezone.utc).isoformat(),
     )
+
+    await _write_audit_log({"type": "signoff", **record.model_dump()})
+    return record
+
+
+@app.post("/api/mesh/analyze-clause", response_model=ChatResponse)
+async def analyze_clause_endpoint(payload: AnalyzeClauseRequest) -> ChatResponse:
+    """Original mesh endpoint — same engine, frontend-shaped response."""
+    session_id = payload.session_id or str(uuid.uuid4())
+    try:
+        result = await run_mesh(
+            message=payload.clause_text,
+            session_id=session_id,
+            jurisdiction=payload.jurisdiction,
+            clause_type=payload.clause_type,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Mesh failure (session=%s)", session_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal error while analyzing the clause.",
+        ) from exc
+
+    await _write_audit_log(
+        {
+            "id": str(uuid.uuid4()),
+            "type": "analysis",
+            "session_id": session_id,
+            "deal_id": payload.deal_id,
+            "jurisdiction": payload.jurisdiction,
+            "tier": result["classification"]["tier"],
+            "created_at": result["created_at"],
+        }
+    )
+    return ChatResponse(**result)
 
 
 if __name__ == "__main__":
+    import os
+
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
+    # Local dev defaults to 8000 (the frontend dev server uses 8080). Cloud Run
+    # injects PORT (8080) via the Dockerfile.
+    port = int(os.environ.get("PORT", "8000"))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

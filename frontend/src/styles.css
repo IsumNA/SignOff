@@ -1,0 +1,120 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-nvidia: var(--nvidia);
+  --color-vertex: var(--vertex);
+  --color-deal: var(--deal);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+:root {
+  --radius: 0.5rem;
+  /* Cursor / VS Code dark theme: flat, fully neutral (zero-chroma) grays,
+     a single blue active accent, and editor-syntax hues for risk colors.
+     Chrome (rails, panels, tabs, status bar) is darker than the document so
+     the contract reads like the focused editor pane. */
+  --background: oklch(0.213 0 0);        /* editor / document  ~#1f1f1f */
+  --foreground: oklch(0.872 0 0);        /* editor text        ~#d4d4d4 */
+  --surface: oklch(0.185 0 0);           /* sidebars / panels  ~#181818 */
+  --surface-elevated: oklch(0.252 0 0);  /* toolbars / popovers ~#252525 */
+  --card: oklch(0.238 0 0);              /* cards              ~#232323 */
+  --card-foreground: oklch(0.872 0 0);
+  --popover: oklch(0.238 0 0);
+  --popover-foreground: oklch(0.872 0 0);
+  --primary: oklch(0.62 0.17 254);       /* Cursor blue accent ~#2f80ed */
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.27 0 0);
+  --secondary-foreground: oklch(0.872 0 0);
+  --muted: oklch(0.245 0 0);
+  --muted-foreground: oklch(0.62 0 0);   /* dim labels         ~#868686 */
+  --accent: oklch(0.285 0 0);            /* hover / selection bg ~#2a2a2a */
+  --accent-foreground: oklch(0.93 0 0);
+  --destructive: oklch(0.63 0.205 25);   /* error red          ~#f14c4c */
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: oklch(0.76 0.115 170);      /* teal-green         ~#4ec9b0 */
+  --warning: oklch(0.80 0.115 85);       /* amber              ~#d7ba7d */
+  --info: oklch(0.67 0.115 250);         /* syntax blue        ~#569cd6 */
+  --nvidia: oklch(0.78 0.21 135);
+  --vertex: oklch(0.68 0.14 252);
+  --deal: oklch(0.72 0.12 330);          /* syntax purple      ~#c586c0 */
+  --border: oklch(0.29 0 0);             /* hairline           ~#2c2c2c */
+  --border-strong: oklch(0.36 0 0);      /* emphasis           ~#3a3a3a */
+  --input: oklch(0.238 0 0);
+  --ring: oklch(0.62 0.17 254);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html, body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+  &::-webkit-scrollbar { width: 6px; height: 6px; }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--color-border-strong);
+    border-radius: 999px;
+  }
+  &::-webkit-scrollbar-track { background: transparent; }
+}
+
+@utility status-dot-pulse {
+  position: relative;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.35;
+    animation: status-pulse 1.6s ease-out infinite;
+  }
+}
+
+@keyframes status-pulse {
+  0% { transform: scale(0.6); opacity: 0.5; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
