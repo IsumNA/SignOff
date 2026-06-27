@@ -1,5 +1,5 @@
-// Light / dark theme handling. The app is dark by default; a `.light` class on
-// <html> swaps to the light palette defined in styles.css. The preference is
+// Light / dark theme handling. The app is light by default; a `.dark` class on
+// <html> swaps to the dark palette defined in styles.css. The preference is
 // stored locally and applied before paint (see the inline script in __root).
 
 export type Theme = "light" | "dark";
@@ -7,11 +7,11 @@ export type Theme = "light" | "dark";
 export const THEME_KEY = "signoff.theme";
 
 export function getStoredTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
+  if (typeof window === "undefined") return "light";
   try {
-    return window.localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark";
+    return window.localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
   } catch {
-    return "dark";
+    return "light";
   }
 }
 
@@ -33,4 +33,4 @@ export function setTheme(theme: Theme): void {
 
 // Inline, self-executing snippet injected into <head> so the correct theme is
 // set before the body paints (avoids a flash of the wrong theme on load).
-export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('${THEME_KEY}');var light=t==='light';var c=document.documentElement.classList;c.toggle('light',light);c.toggle('dark',!light);}catch(e){document.documentElement.classList.add('dark');}})();`;
+export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('${THEME_KEY}');var dark=t==='dark';var c=document.documentElement.classList;c.toggle('dark',dark);c.toggle('light',!dark);}catch(e){document.documentElement.classList.add('light');}})();`;

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { ArrowUpRight, Cpu, Loader2, Network, Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowUpRight, ChevronDown, Cpu, Loader2, Network, Plus } from "lucide-react";
 import {
   getHealth,
   getInsights,
@@ -186,72 +186,103 @@ const SEVERITY_COLOR: Record<InsightPattern["severity"], string> = {
   low: "var(--color-muted-foreground)",
 };
 
-function ScrutinyPanel({ insights }: { insights: PortfolioInsights }) {
+const SEVERITY_RANK: Record<InsightPattern["severity"], number> = {
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
+type MatterFlag = { title: string; severity: InsightPattern["severity"] };
+
+// Per-row scrutiny marker — weaves the portfolio insight onto the actual matter
+// it concerns, so attention lives on the matter rather than in a separate block.
+function ScrutinyMark({ flags }: { flags: MatterFlag[] }) {
+  const top = flags.reduce((a, b) =>
+    SEVERITY_RANK[b.severity] > SEVERITY_RANK[a.severity] ? b : a,
+  );
   return (
-    <section className="mb-9 rounded-xl border border-border bg-card/30 p-5 animate-reveal">
-      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <ReviewGlass className="h-4 w-4 text-muted-foreground" />
-          <h2 className="font-serif text-[18px] font-medium tracking-[-0.01em]">
-            What to scrutinise
-          </h2>
-        </div>
-        <span className="text-[11px] text-muted-foreground">
-          Learned from {insights.learned_from.matters} matter
-          {insights.learned_from.matters === 1 ? "" : "s"}
-          {insights.learned_from.decisions > 0
-            ? ` · ${insights.learned_from.decisions} recorded decision${insights.learned_from.decisions === 1 ? "" : "s"}`
-            : ""}
-        </span>
-      </div>
+    <span
+      title={`Scrutinise — ${flags.map((f) => f.title).join(" · ")}`}
+      className="inline-flex shrink-0 items-center"
+    >
+      <ReviewGlass className="h-3.5 w-3.5" style={{ color: SEVERITY_COLOR[top.severity] }} />
+    </span>
+  );
+}
 
-      <div className="grid gap-2.5">
-        {insights.patterns.map((p, i) => (
-          <div
-            key={i}
-            className="flex items-start gap-3 rounded-lg border border-border bg-surface/40 px-3.5 py-3"
+// Low-profile, collapsed-by-default strip. Keeps the matter ledger as the focus
+// while still surfacing the cross-matter (non-matter-specific) patterns on demand.
+function ScrutinyStrip({ insights }: { insights: PortfolioInsights }) {
+  const [open, setOpen] = useState(false);
+  const count = insights.patterns.length;
+  const hasHigh = insights.patterns.some((p) => p.severity === "high");
+  const accent = hasHigh ? "var(--color-destructive)" : "var(--color-muted-foreground)";
+
+  return (
+    <div className="mb-3">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-3 rounded-lg border border-border bg-card/20 px-4 py-2 text-left transition hover:bg-accent/30"
+      >
+        <span className="flex items-center gap-2 text-[12px] font-medium text-foreground">
+          <ReviewGlass className="h-3.5 w-3.5" style={{ color: accent }} />
+          What to scrutinise
+          <span
+            className="inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold"
+            style={{
+              color: accent,
+              backgroundColor: `color-mix(in oklab, ${accent} 14%, transparent)`,
+            }}
           >
-            <span
-              className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full"
-              style={{ background: SEVERITY_COLOR[p.severity] }}
-            />
-            <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-medium text-foreground">{p.title}</p>
-              <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{p.detail}</p>
-              {p.matters.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {p.matters.map((m) => (
-                    <span
-                      key={m}
-                      className="rounded border border-border bg-card px-1.5 py-0.5 text-[10.5px] text-muted-foreground"
-                    >
-                      {m}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {insights.benchmarks.length > 0 && (
-        <div className="mt-4 border-t border-border pt-3">
-          <span className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-            Typical compliance by practice area
+            {count}
           </span>
-          <div className="flex flex-wrap gap-x-5 gap-y-1.5">
-            {insights.benchmarks.map((b) => (
-              <span key={b.asset_class} className="text-[12px] text-muted-foreground">
-                {b.asset_class}{" "}
-                <span className="font-mono tabular-nums text-foreground">{b.avg_compliance}%</span>
-                <span className="opacity-60"> · {b.matters}</span>
+          <span className="hidden text-[11px] font-normal text-muted-foreground sm:inline">
+            learned from {insights.learned_from.matters} matter
+            {insights.learned_from.matters === 1 ? "" : "s"}
+            {insights.learned_from.decisions > 0
+              ? ` · ${insights.learned_from.decisions} decision${insights.learned_from.decisions === 1 ? "" : "s"}`
+              : ""}
+          </span>
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="mt-2 grid gap-2 rounded-lg border border-border bg-card/20 p-3 animate-reveal">
+          {insights.patterns.map((p, i) => (
+            <div key={i} className="flex items-start gap-3">
+              <span
+                className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ background: SEVERITY_COLOR[p.severity] }}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-[12.5px] font-medium text-foreground">{p.title}</p>
+                <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{p.detail}</p>
+              </div>
+            </div>
+          ))}
+          {insights.benchmarks.length > 0 && (
+            <div className="mt-1 border-t border-border pt-2">
+              <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                Typical compliance by practice area
               </span>
-            ))}
-          </div>
+              <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+                {insights.benchmarks.map((b) => (
+                  <span key={b.asset_class} className="text-[12px] text-muted-foreground">
+                    {b.asset_class}{" "}
+                    <span className="font-mono tabular-nums text-foreground">{b.avg_compliance}%</span>
+                    <span className="opacity-60"> · {b.matters}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -281,6 +312,21 @@ function Ledger() {
   const meshLive = health
     ? Object.values(health.integrations).some((v) => v === "live")
     : false;
+
+  // Map each portfolio pattern onto the matter(s) it names, so scrutiny shows up
+  // contextually on the relevant ledger row instead of in a separate block.
+  const scrutinyByMatter = useMemo(() => {
+    const map = new Map<string, MatterFlag[]>();
+    if (!insights) return map;
+    for (const p of insights.patterns) {
+      for (const name of p.matters) {
+        const list = map.get(name) ?? [];
+        list.push({ title: p.title, severity: p.severity });
+        map.set(name, list);
+      }
+    }
+    return map;
+  }, [insights]);
 
   function openMatter(m: Matter) {
     // Route to the matter's current lifecycle stage.
@@ -386,9 +432,10 @@ function Ledger() {
             />
           </div>
 
-          {/* What to scrutinise — cross-matter patterns the supervisor should look at */}
+          {/* What to scrutinise — compact, collapsed by default so the matter
+              ledger stays the focus; matter-specific flags appear on rows below. */}
           {insights && insights.patterns.length > 0 && (
-            <ScrutinyPanel insights={insights} />
+            <ScrutinyStrip insights={insights} />
           )}
 
           {/* Ledger table */}
@@ -416,6 +463,7 @@ function Ledger() {
               matters.map((m) => {
                 const sm = STATUS_META[m.status];
                 const { Icon } = sm;
+                const flags = scrutinyByMatter.get(m.name);
                 return (
                   <div
                     key={m.id}
@@ -434,8 +482,9 @@ function Ledger() {
                         <Icon className="h-4 w-4" />
                       </span>
                       <div className="min-w-0">
-                        <span className="block truncate text-[13px] font-semibold text-foreground">
-                          {m.name}
+                        <span className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
+                          <span className="truncate">{m.name}</span>
+                          {flags && flags.length > 0 && <ScrutinyMark flags={flags} />}
                         </span>
                         <span className="block truncate text-[11px] text-muted-foreground">
                           {m.client ?? sm.label}

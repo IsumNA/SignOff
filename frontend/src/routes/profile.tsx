@@ -163,7 +163,7 @@ function Profile() {
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [saved, setSaved] = useState(false);
-  const [theme, setThemeState] = useState<Theme>("dark");
+  const [theme, setThemeState] = useState<Theme>("light");
 
   useEffect(() => {
     setPrefs(loadPrefs());
