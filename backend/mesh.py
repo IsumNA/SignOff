@@ -145,9 +145,9 @@ def _build_evidence(
             {
                 "kind": "regulation",
                 "title": (r.get("title") or "EU legislation")[:140],
-                "source": f"EU Cellar · CELEX {r.get('celex', '')}",
-                "detail": "Authoritative EU act retrieved live from the Publications "
-                "Office (Cellar SPARQL).",
+                "source": f"EU Publications Office · CELEX {r.get('celex', '')}",
+                "detail": "Authoritative EU act retrieved live from the EU "
+                "Publications Office.",
                 "url": r.get("url", ""),
             }
         )
@@ -158,7 +158,7 @@ def _build_evidence(
             {
                 "kind": "precedent",
                 "title": str(title),
-                "source": f"Neo4j · {p.get('clause_id', 'precedent')}",
+                "source": f"Precedent graph · {p.get('clause_id', 'precedent')}",
                 "detail": (p.get("clause_text") or "")[:240],
                 "url": "",
             }
@@ -170,7 +170,7 @@ def _build_evidence(
                 "kind": "citation",
                 "title": str(url).split("//")[-1].split("/")[0] or "Source",
                 "source": "Perplexity",
-                "detail": "Web-grounded source cited in live research.",
+                "detail": "Source cited in live research.",
                 "url": str(url),
             }
         )
@@ -181,7 +181,7 @@ def _build_evidence(
             {
                 "kind": "precedent",
                 "title": f"Comparable {clause_type or 'clause'} — Project Atlas SPA",
-                "source": "Neo4j · demo-precedent",
+                "source": "Precedent graph · demo",
                 "detail": "Buyer-favorable formulation accepted in a prior matter; "
                 "narrower carve-outs and an explicit liability cap.",
                 "url": "",
@@ -189,7 +189,7 @@ def _build_evidence(
             {
                 "kind": "regulation",
                 "title": "Regulation (EU) 2016/679 (GDPR), Art. 28",
-                "source": "EU Cellar · demo",
+                "source": "EU Publications Office · demo",
                 "detail": "Processor obligations relevant to data-handling clauses.",
                 "url": "https://eur-lex.europa.eu/eli/reg/2016/679/oj",
             },
@@ -237,9 +237,9 @@ def _demo_synthesis(
     deal_reasoning = "\n".join(
         [
             f"- Recommended posture: {posture.title()} (Tier {tier} · {TIER_LABEL[tier]}).",
-            f"- Risk Agent severity: {severity}"
+            f"- Risk review severity: {severity}"
             + (f" on {', '.join(flagged)}." if flagged else "."),
-            f"- Precedent Agent: {precedent_count} comparable precedent(s) reviewed.",
+            f"- Precedent review: {precedent_count} comparable precedent(s) reviewed.",
             "- Negotiate explicit caps and carve-outs where exposure is open-ended."
             if tier >= 2
             else "- Standard terms; proceed and record in the audit log.",
@@ -255,41 +255,41 @@ def _demo_synthesis(
     agents = [
         {
             "agent": "Risk Agent",
-            "model": "NVIDIA NIM",
-            "summary": f"On-prem high-security review flagged severity {severity}.",
+            "model": "NVIDIA Nemotron",
+            "summary": f"Confidential risk review flagged severity {severity}.",
             "mode": "live" if nim_is_live() else "demo",
             "findings": flagged or ["No sensitive risk terms detected."],
             "stance": severity,
             "phase": "initial",
-            "assumptions": ["Clause processed locally; no sensitive data left the boundary."],
+            "assumptions": ["Clause reviewed confidentially; no sensitive text left the secure environment."],
             "red_flags": flagged,
-            "reasoning": nim.get("rationale", "Local heuristic risk assessment."),
+            "reasoning": nim.get("rationale", "Confidential risk assessment of the clause."),
         },
         {
             "agent": "Precedent Agent",
-            "model": "Vertex AI · EU Cellar",
+            "model": "Neo4j + EU Publications Office",
             "summary": (
-                f"{precedent_count} precedent(s) + {eu_count} EU act(s) grounded."
+                f"{precedent_count} precedent(s) + {eu_count} EU act(s) reviewed."
             ),
             "mode": "live" if (neo4j_is_live() or eu_count) else "demo",
             "findings": [
-                f"{precedent_count} comparable precedent(s) in the citation graph.",
-                f"{eu_count} authoritative EU act(s) via the Publications Office.",
+                f"{precedent_count} comparable precedent(s) in the precedent database.",
+                f"{eu_count} authoritative EU act(s) via the EU Publications Office.",
             ]
             + [f"{a.get('celex')} — {a.get('title', '')[:80]}" for a in eu_acts[:2]],
             "stance": "grounded" if (precedent_count or eu_count) else "sparse-precedent",
             "phase": "initial",
-            "assumptions": ["Graph reflects the firm's curated precedent corpus."],
+            "assumptions": ["The precedent database reflects the firm's curated prior matters."],
             "red_flags": [],
             "reasoning": (
-                "Matched precedent clauses and live EU legislation (Cellar SPARQL) to "
-                "ground the risk posture in prior outcomes and binding regulation."
+                "Matched precedent clauses and live EU legislation (EU Publications "
+                "Office) to ground the risk position in prior outcomes and binding regulation."
             ),
         },
         {
             "agent": "Deal Agent",
             "model": "Gemini 2.5 Flash",
-            "summary": f"Synthesized verdict: Tier {tier} · {TIER_LABEL[tier]}.",
+            "summary": f"Recommendation: Tier {tier} · {TIER_LABEL[tier]}.",
             "mode": "live" if vertex_is_live() else "demo",
             "findings": triggers,
             "stance": posture,
@@ -443,7 +443,7 @@ async def run_mesh(
             "nvidia_nim_infer",
             "live" if nim_is_live() else "demo",
             assess_local_risk(clause_text),
-            "Local high-security risk inference on sensitive clause text.",
+            "Confidential risk review of the clause text.",
         ),
         _run_tool(
             session_id,
@@ -451,7 +451,7 @@ async def run_mesh(
             "query_neo4j_graph",
             "live" if neo4j_is_live() else "demo",
             query_precedents(effective_type),
-            "GraphRAG precedent + citation retrieval.",
+            "Precedent and citation search.",
         ),
         _run_tool(
             session_id,
@@ -459,7 +459,7 @@ async def run_mesh(
             "query_eu_cellar_api",
             "live",  # public EU Publications Office — no key, genuinely live
             search_eu_legislation(clause_text),
-            "Live EU legislation grounding via the Publications Office (Cellar).",
+            "Live EU legislation check (EU Publications Office).",
         ),
         _run_tool(
             session_id,
@@ -467,7 +467,7 @@ async def run_mesh(
             "query_perplexity_research",
             "live" if perplexity_is_live() else "demo",
             research_clause(clause_text, jurisdiction),
-            "Live web-grounded legal research.",
+            "Live legal research.",
         ),
     )
     traces.extend([nim_trace, graph_trace, eu_trace, web_trace])
@@ -475,7 +475,7 @@ async def run_mesh(
     # --- Synthesis (Gemini live, deterministic demo otherwise) -----------
     synth_id = str(uuid.uuid4())
     synth_mode = "live" if vertex_is_live() else "demo"
-    synth_detail = "Fuse asymmetric signals into a risk tier (strict JSON)."
+    synth_detail = "Combine all findings into a single risk rating."
     synth_started = _now()
     synth_t0 = perf_counter()
     synth_status = "success"

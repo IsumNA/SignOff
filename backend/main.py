@@ -302,9 +302,9 @@ async def _mirror_to_firestore(entry: Dict[str, Any]) -> None:
 # Ordered so the actor string reads reasoning-first, then retrieval signals.
 _TOOL_ATTRIBUTION: List[tuple[str, str]] = [
     ("nvidia_nim_infer", "NVIDIA Nemotron"),
-    ("gemini_reason", "Gemini 2.5 Flash"),
-    ("query_neo4j_graph", "Neo4j GraphRAG"),
-    ("query_eu_cellar_api", "EU Cellar"),
+    ("gemini_reason", "Google Gemini"),
+    ("query_neo4j_graph", "Precedent graph (Neo4j)"),
+    ("query_eu_cellar_api", "EU Publications Office"),
     ("query_perplexity_research", "Perplexity"),
 ]
 
@@ -313,7 +313,7 @@ def _models_actor(result: Dict[str, Any]) -> str:
     """Build the audit actor from the models/services that actually ran."""
     tools = {t.get("tool") for t in result.get("traces", [])}
     names = [name for tool, name in _TOOL_ATTRIBUTION if tool in tools]
-    return ", ".join(names) if names else "agent mesh"
+    return ", ".join(names) if names else "AI review"
 
 
 async def _audit(

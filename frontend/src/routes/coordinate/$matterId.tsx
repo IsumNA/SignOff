@@ -19,7 +19,7 @@ export const Route = createFileRoute("/coordinate/$matterId")({
       { title: "SignOff — Coordinate" },
       {
         name: "description",
-        content: "Assign and sequence autonomous agents across a matter's workstreams.",
+        content: "Plan and track who is doing what across a matter's workstreams.",
       },
     ],
   }),
@@ -28,10 +28,10 @@ export const Route = createFileRoute("/coordinate/$matterId")({
 
 const COLUMN_META: Record<TaskColumn, { label: string; color: string }> = {
   queued: { label: "Queued", color: "var(--color-muted-foreground)" },
-  risk: { label: "Risk Agent", color: "var(--color-foreground)" },
+  risk: { label: "Risk Review", color: "var(--color-foreground)" },
   precedent: { label: "Precedent", color: "var(--color-foreground)" },
   research: { label: "Research", color: "var(--color-foreground)" },
-  synthesis: { label: "Synthesis", color: "var(--color-foreground)" },
+  synthesis: { label: "Recommendation", color: "var(--color-foreground)" },
   counsel: { label: "Awaiting Counsel", color: "var(--color-foreground)" },
   signed: { label: "Signed", color: "var(--color-muted-foreground)" },
 };
@@ -123,7 +123,7 @@ function Coordinate() {
           <div className="min-w-0">
             <h1 className="font-serif text-[19px] font-medium tracking-[-0.01em]">Coordination board</h1>
             <p className="text-[11.5px] text-muted-foreground">
-              Stage 2 — agents pick up workstreams and move them across the mesh.
+              Stage 2 — each workstream moves across the board as its review is completed.
             </p>
           </div>
         </div>

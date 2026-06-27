@@ -294,16 +294,16 @@ export function openTraceStream(
 // ---- mapping helpers between backend payloads and the SignOff UI types ----
 
 const TOOL_SERVICE: Record<string, string> = {
-  nvidia_nim_infer: "NVIDIA NIM",
-  query_neo4j_graph: "Neo4j Aura",
-  gemini_reason: "Vertex AI",
-  gemini_recommend: "Vertex AI",
+  nvidia_nim_infer: "NVIDIA Nemotron",
+  query_neo4j_graph: "Precedent graph (Neo4j)",
+  gemini_reason: "Google Gemini",
+  gemini_recommend: "Google Gemini",
   query_perplexity_research: "Perplexity",
-  query_eu_cellar_api: "EU Cellar",
+  query_eu_cellar_api: "EU Publications Office",
 };
 
 export function serviceForTool(tool: string): string {
-  return TOOL_SERVICE[tool] ?? "Cloud Run";
+  return TOOL_SERVICE[tool] ?? "AI service";
 }
 
 export function durationMs(t: BackendTrace): number | undefined {

@@ -316,7 +316,7 @@ def _mock_nim_assessment(clause_text: str) -> Dict[str, Any]:
         "severity": severity,
         "flagged_terms": flags,
         "rationale": (
-            "Local high-security heuristic over sensitive clause text; "
+            "Confidential review of the clause text; "
             f"{len(flags)} risk signal(s) detected."
         ),
         "processed_locally": True,

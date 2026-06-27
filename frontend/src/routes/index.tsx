@@ -248,9 +248,13 @@ function Ledger() {
               style={{ background: meshLive ? "var(--color-success)" : "var(--color-warning)" }}
             />
             <Network className="h-3 w-3" />
-            {health ? (meshLive ? "mesh online" : "demo mode") : "offline"}
+            {health ? (meshLive ? "AI online" : "demo data") : "offline"}
           </span>
-          <div className="flex items-center gap-2">
+          <Link
+            to="/profile"
+            className="flex items-center gap-2 rounded-lg px-1 py-0.5 transition hover:bg-accent/40"
+            title="Profile & settings"
+          >
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-foreground">
               RC
             </span>
@@ -258,7 +262,7 @@ function Ledger() {
               <span className="block text-[12px] font-semibold text-foreground">Clifford Chance</span>
               <span className="block text-[10px] text-muted-foreground">Rob Clay · M&amp;A Partner</span>
             </span>
-          </div>
+          </Link>
         </div>
       </header>
 
@@ -291,7 +295,7 @@ function Ledger() {
             />
             <StatCell
               Icon={Scales}
-              label="Avg Compliance Envelope"
+              label="Avg Compliance Score"
               value={summary ? `${summary.avg_envelope}%` : "—"}
             />
             <StatCell
@@ -306,9 +310,9 @@ function Ledger() {
             <div className="grid grid-cols-[1.5fr_0.9fr_1.4fr_1.2fr_0.9fr_1.2fr_auto] items-center gap-4 border-b border-border bg-surface/60 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               <span>Active Matter</span>
               <span>Asset / Size</span>
-              <span>Agents Deployed</span>
+              <span>AI Reviewers</span>
               <span>Lifecycle Stage</span>
-              <span>Envelope</span>
+              <span>Compliance</span>
               <span>Blockers Pending</span>
               <span className="text-right">Action</span>
             </div>
@@ -410,8 +414,8 @@ function Ledger() {
           {/* Footnote */}
           <div className="mt-4 flex items-center gap-2 text-[11px] text-muted-foreground">
             <Cpu className="h-3.5 w-3.5" />
-            Autonomous workstreams executed by a multi-agent mesh, bounded by deterministic graph
-            guardrails and an immutable Firestore audit trail.
+            Work carried out by a team of AI reviewers, kept within the risk limits you set, with
+            a complete, tamper-proof record of every step.
           </div>
         </div>
       </main>

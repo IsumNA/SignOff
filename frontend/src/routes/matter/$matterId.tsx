@@ -17,7 +17,6 @@ import {
   ChevronRight,
   CircleDot,
   FileText,
-  GitBranch,
   Infinity,
   Link2,
   Loader2,
@@ -199,9 +198,9 @@ const TIER_STYLE: Record<number, { color: string; Icon: typeof Gavel; sub: strin
 };
 
 const AGENT_META: Record<string, { name: string; vendor: string; Icon: typeof Gavel; color: string }> = {
-  risk: { name: "Risk Agent", vendor: "NVIDIA NIM", Icon: Gavel, color: "var(--color-foreground)" },
-  precedent: { name: "Precedent Agent", vendor: "Vertex AI", Icon: Scales, color: "var(--color-foreground)" },
-  deal: { name: "Deal Agent", vendor: "Gemini 2.5 Flash", Icon: Seal, color: "var(--color-foreground)" },
+  risk: { name: "Risk Review", vendor: "NVIDIA Nemotron", Icon: Gavel, color: "var(--color-foreground)" },
+  precedent: { name: "Precedent Review", vendor: "Neo4j + EU Publications Office", Icon: Scales, color: "var(--color-foreground)" },
+  deal: { name: "Recommendation", vendor: "Google Gemini", Icon: Seal, color: "var(--color-foreground)" },
 };
 
 const EVIDENCE_META: Record<EvidenceItem["kind"], { Icon: typeof Gavel; label: string }> = {
@@ -843,7 +842,7 @@ function SignOff() {
           </span>
           <span className="flex items-center gap-1.5">
             <Network className="h-3 w-3" />
-            {health ? (meshLive ? "mesh online" : "demo mode") : "offline"}
+            {health ? (meshLive ? "AI online" : "demo data") : "offline"}
           </span>
           <span className="hidden lg:inline font-mono">{deal.law}</span>
         </div>
@@ -854,13 +853,17 @@ function SignOff() {
         <nav className="flex w-56 shrink-0 flex-col border-r border-border bg-surface/60">
           {/* Profile + Playbook settings entry point */}
           <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2.5">
-            <div className="flex min-w-0 items-center gap-2">
+            <Link
+              to="/profile"
+              title="Profile & settings"
+              className="flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 transition hover:bg-accent/40"
+            >
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-foreground">RC</span>
               <span className="min-w-0">
                 <span className="block truncate text-[12px] font-semibold text-foreground">Clifford Chance</span>
                 <span className="block truncate text-[10px] text-muted-foreground">Rob Clay · Partner</span>
               </span>
-            </div>
+            </Link>
             <button
               onClick={() => setView((v) => (v === "playbook" ? "document" : "playbook"))}
               title="Playbook settings"
@@ -1025,7 +1028,7 @@ function SignOff() {
 
                   {/* Inline redline diff — stacked, GitHub/Cursor-style */}
                   {isSel && c.redline && posture === "amend" && (
-                    <div className="mt-3 flex flex-col gap-2 rounded-lg border border-white/[0.06] bg-surface/60 p-4 text-[13px] leading-relaxed">
+                    <div className="mt-3 flex flex-col gap-2 rounded-lg border border-border bg-surface/60 p-4 text-[13px] leading-relaxed">
                       <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                         <PenLine className="h-3 w-3 text-muted-foreground" /> Proposed redline
                       </div>
@@ -1136,7 +1139,7 @@ function SignOff() {
 
               <div className="flex-1 overflow-y-auto scrollbar-thin px-5 py-5 space-y-4">
                 {showAudit && (
-                  <div className="animate-reveal rounded-lg border border-white/[0.06] bg-card/50 p-4">
+                  <div className="animate-reveal rounded-lg border border-border bg-card/50 p-4">
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Audit trail</h3>
                       {auditVerified !== null && (
@@ -1146,10 +1149,10 @@ function SignOff() {
                             color: auditVerified ? "var(--color-foreground)" : "var(--color-destructive)",
                             backgroundColor: `color-mix(in oklab, ${auditVerified ? "var(--color-foreground)" : "var(--color-destructive)"} 12%, transparent)`,
                           }}
-                          title="Each record embeds the SHA-256 hash of the previous one. The server recomputes the chain on every read."
+                          title="Every entry is sealed to the one before it, so any later edit or deletion is detectable. The record is re-checked each time it is opened."
                         >
                           <Lock className="h-2.5 w-2.5" />
-                          {auditVerified ? "Hash chain verified" : "Chain integrity broken"}
+                          {auditVerified ? "Tamper-proof — verified" : "Record integrity broken"}
                         </span>
                       )}
                     </div>
@@ -1182,7 +1185,7 @@ function SignOff() {
                                   </span>
                                 )}
                               </span>
-                              <span className="font-mono text-[10px] text-muted-foreground" title={`hash ${a.hash}`}>
+                              <span className="font-mono text-[10px] text-muted-foreground" title={`Seal: ${a.hash}`}>
                                 #{a.seq} · {a.hash.slice(0, 8)}
                               </span>
                             </div>
@@ -1199,11 +1202,11 @@ function SignOff() {
                 )}
 
                 {loading ? (
-                  <div className="rounded-xl border border-white/[0.06] bg-card/40 p-4">
+                  <div className="rounded-xl border border-border bg-card/40 p-4">
                     <div className="mb-3 flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin text-foreground" />
                       <span className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Agent mesh executing
+                        AI review in progress
                       </span>
                       <span className="ml-auto font-mono text-[10px] text-muted-foreground">
                         {liveTraces.filter((t) => t.status !== "running").length}/{liveTraces.length || "…"}
@@ -1211,7 +1214,7 @@ function SignOff() {
                     </div>
                     {liveTraces.length === 0 ? (
                       <p className="text-[12px] text-muted-foreground/80">
-                        Dispatching asymmetric agents…
+                        Starting the review…
                       </p>
                     ) : (
                       <ul className="space-y-1.5">
@@ -1226,7 +1229,7 @@ function SignOff() {
                           return (
                             <li
                               key={t.id}
-                              className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-surface/40 px-3 py-2 animate-reveal"
+                              className="flex items-center gap-2 rounded-lg border border-border bg-surface/40 px-3 py-2 animate-reveal"
                             >
                               {running ? (
                                 <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-foreground" />
@@ -1283,7 +1286,7 @@ function SignOff() {
                     )}
                   </div>
                 ) : selected.severity === "clean" && !analysis ? (
-                  <div className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-card/40 px-4 py-3.5 text-[13px] text-muted-foreground">
+                  <div className="flex items-center gap-2 rounded-lg border border-border bg-card/40 px-4 py-3.5 text-[13px] text-muted-foreground">
                     <Seal className="h-4 w-4 text-muted-foreground" /> No material issues detected.
                   </div>
                 ) : analysis ? (
@@ -1312,7 +1315,7 @@ function SignOff() {
                     )}
 
                     {/* Recommendation */}
-                    <div className="rounded-xl border border-white/[0.06] bg-card/60 p-5">
+                    <div className="rounded-xl border border-border bg-card/60 p-5">
                       <div className="mb-3 flex items-center gap-2">
                         <Seal className="h-3.5 w-3.5" style={{ color: AGENT_META.deal.color }} />
                         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Recommendation</span>
@@ -1330,7 +1333,7 @@ function SignOff() {
                         return (
                           <div className="mb-3">
                             <div className="flex items-center justify-between text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-                              <span>Model confidence</span>
+                              <span>AI confidence</span>
                               <span className="font-mono tabular-nums" style={{ color: accent }}>{pct}%</span>
                             </div>
                             <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-muted/50">
@@ -1343,7 +1346,7 @@ function SignOff() {
                                   color: "var(--color-foreground)",
                                 }}>
                                 <Gavel className="mt-px h-3.5 w-3.5 shrink-0 text-[color:var(--color-destructive)]" />
-                                <span><strong className="font-semibold">Low confidence / elevated uncertainty.</strong> The mesh signals possible ambiguity or conflicting evidence — verify manually before sign-off.</span>
+                                <span><strong className="font-semibold">Low confidence.</strong> The AI sees possible ambiguity or conflicting evidence here — review carefully before sign-off.</span>
                               </div>
                             )}
                           </div>
@@ -1381,7 +1384,7 @@ function SignOff() {
                           {analysis.evidence
                             .filter((e) => e.kind === openEvidence)
                             .map((e, i) => (
-                              <li key={i} className="rounded-lg border border-white/[0.06] bg-card/60 px-3.5 py-2.5">
+                              <li key={i} className="rounded-lg border border-border bg-card/60 px-3.5 py-2.5">
                                 <p className="text-[12px] font-semibold leading-snug text-foreground">{e.title}</p>
                                 {e.detail && <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{e.detail}</p>}
                                 <div className="mt-1 flex items-center justify-between gap-2">
@@ -1406,7 +1409,7 @@ function SignOff() {
                           className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground"
                         >
                           <Lock className="h-3.5 w-3.5" />
-                          {showProvenance ? "Hide" : "View"} provenance
+                          {showProvenance ? "Hide" : "View"} sources &amp; checks
                           <span className="font-mono opacity-70">{analysis.traces.length}</span>
                           <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showProvenance ? "" : "-rotate-90"}`} />
                         </button>
@@ -1421,7 +1424,7 @@ function SignOff() {
                               return (
                                 <li
                                   key={t.id}
-                                  className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-surface/40 px-3 py-2"
+                                  className="flex items-center gap-2 rounded-lg border border-border bg-surface/40 px-3 py-2"
                                 >
                                   <span
                                     className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider"
@@ -1462,14 +1465,14 @@ function SignOff() {
                       </div>
                     )}
 
-                    {/* Demoted telemetry */}
+                    {/* AI reasoning (secondary) */}
                     <div>
                       <button
                         onClick={() => setShowReasoning((v) => !v)}
                         className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground"
                       >
                         <FileText className="h-3.5 w-3.5" />
-                        {showReasoning ? "Hide" : "View"} agent reasoning
+                        {showReasoning ? "Hide" : "View"} AI reasoning
                         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showReasoning ? "" : "-rotate-90"}`} />
                       </button>
                       {showReasoning && (
@@ -1478,7 +1481,7 @@ function SignOff() {
                             const m = AGENT_META[uiAgent(a.agent)];
                             const { Icon } = m;
                             return (
-                              <div key={a.agent} className="rounded-lg border border-white/[0.06] bg-surface/40 p-3.5">
+                              <div key={a.agent} className="rounded-lg border border-border bg-surface/40 p-3.5">
                                 <div className="mb-1.5 flex items-center gap-2">
                                   <Icon className="h-3.5 w-3.5" style={{ color: m.color }} />
                                   <span className="text-[12px] font-semibold">{m.name}</span>
@@ -1525,7 +1528,7 @@ function SignOff() {
                   </>
                 ) : (
                   <div className="py-8 text-[13px] text-muted-foreground">
-                    Couldn't reach the agent mesh.{" "}
+                    Couldn't reach the AI review.{" "}
                     <button onClick={() => selected && runAnalysis(selected, selected.text)} className="text-foreground link-underline">
                       Retry
                     </button>
@@ -1547,17 +1550,17 @@ function SignOff() {
                     }}
                     disabled={loading}
                     rows={1}
-                    placeholder={`Ask the agents about ${selected.ref}…`}
+                    placeholder={`Ask the AI about ${selected.ref}…`}
                     className="max-h-32 w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-[13px] leading-relaxed placeholder:text-muted-foreground focus:outline-none disabled:opacity-60"
                   />
                   <div className="flex items-center gap-1 px-2 pb-2 pt-0.5">
                     <button
                       type="button"
-                      title="Agent mesh · all specialists"
+                      title="Full AI review · all specialists"
                       className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
                       <Infinity className="h-3.5 w-3.5" />
-                      Mesh
+                      Full review
                       <ChevronDown className="h-3 w-3 opacity-60" />
                     </button>
                     <button
@@ -1600,15 +1603,15 @@ function SignOff() {
       <footer className="flex h-6 shrink-0 items-center justify-between border-t border-border bg-surface px-3 text-[10px] text-muted-foreground">
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
-            <GitBranch className="h-3 w-3" />
-            {deal.name.toLowerCase().replace(/\s+/g, "-")}
+            <DocumentFold className="h-3 w-3" />
+            {deal.name}
           </span>
           <span className="flex items-center gap-1">
             <span
               className="h-1.5 w-1.5 rounded-full"
               style={{ background: meshLive ? "var(--color-foreground)" : "var(--color-muted-foreground)" }}
             />
-            {health ? (meshLive ? "mesh: live" : "mesh: demo") : "mesh: offline"}
+            {health ? (meshLive ? "AI: live" : "AI: demo") : "AI: offline"}
           </span>
           {loading && (
             <span className="flex items-center gap-1">

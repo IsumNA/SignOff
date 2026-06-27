@@ -13,7 +13,7 @@ export const Route = createFileRoute("/plan")({
       {
         name: "description",
         content:
-          "Define the supervision envelope and deploy autonomous agents onto a new matter.",
+          "Set the risk limits for a new matter and choose which AI reviewers work on it.",
       },
     ],
   }),
@@ -48,9 +48,9 @@ const SCOPE_OPTIONS = [
   "Governing Law",
 ];
 const AGENT_OPTIONS: { name: string; role: string }[] = [
-  { name: "Local NIM", role: "On-prem high-security risk" },
-  { name: "Gemini 2.5 Flash", role: "Synthesis & decisioning" },
-  { name: "Perplexity", role: "Web-grounded research" },
+  { name: "NVIDIA Nemotron", role: "Confidential risk review" },
+  { name: "Gemini 2.5 Flash", role: "Analysis & recommendations" },
+  { name: "Perplexity", role: "Live legal research" },
   { name: "Claude 3.5 Sonnet", role: "Precedent drafting" },
 ];
 
@@ -118,7 +118,7 @@ function PlanMatter() {
     "Warranties & Indemnities",
     "Merger Control & FDI",
   ]);
-  const [agents, setAgents] = useState<string[]>(["Local NIM", "Gemini 2.5 Flash"]);
+  const [agents, setAgents] = useState<string[]>(["NVIDIA Nemotron", "Gemini 2.5 Flash"]);
   const [redlines, setRedlines] = useState<string[]>([
     "No uncapped indemnities without partner sign-off",
     "No remedies offered to competition authorities without partner approval",
@@ -143,7 +143,7 @@ function PlanMatter() {
       return;
     }
     if (agents.length === 0) {
-      setError("Deploy at least one agent.");
+      setError("Select at least one AI reviewer.");
       return;
     }
     setSubmitting(true);
@@ -195,8 +195,8 @@ function PlanMatter() {
               Plan a New Matter
             </h1>
             <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-muted-foreground">
-              Stage 1 of supervision. Define the deterministic risk envelope the agents must
-              operate inside, then deploy them. Nothing runs until you set the guardrails.
+              Stage 1 of supervision. Set the risk limits this matter must stay within, then
+              choose your AI reviewers. Nothing runs until you set the limits.
             </p>
           </div>
 
@@ -259,8 +259,8 @@ function PlanMatter() {
             <section className="rounded-xl border border-border bg-card/30 p-6">
               <div className="mb-5 flex items-center gap-2">
                 <Scales className="h-4 w-4 text-muted-foreground" />
-                <h2 className="font-serif text-[18px] font-medium tracking-[-0.01em]">Risk envelope</h2>
-                <span className="text-[11px] text-muted-foreground">— the deterministic guardrails</span>
+                <h2 className="font-serif text-[18px] font-medium tracking-[-0.01em]">Risk limits</h2>
+                <span className="text-[11px] text-muted-foreground">— the boundaries every review must respect</span>
               </div>
 
               <div className="grid gap-5 sm:grid-cols-2">
@@ -274,7 +274,7 @@ function PlanMatter() {
                     className="w-full accent-[color:var(--color-foreground)]"
                   />
                   <span className="mt-1 block text-[11px] text-muted-foreground">
-                    Matters below this envelope are auto-flagged for partner review.
+                    Matters below this score are automatically flagged for partner review.
                   </span>
                 </Field>
                 <Field label="Auto-escalate at tier">
@@ -349,8 +349,8 @@ function PlanMatter() {
             <section className="rounded-xl border border-border bg-card/30 p-6">
               <div className="mb-5 flex items-center gap-2">
                 <Workstreams className="h-4 w-4 text-muted-foreground" />
-                <h2 className="font-serif text-[18px] font-medium tracking-[-0.01em]">Deploy agents</h2>
-                <span className="text-[11px] text-muted-foreground">— the autonomous workforce, bounded by the envelope</span>
+                <h2 className="font-serif text-[18px] font-medium tracking-[-0.01em]">Assign AI reviewers</h2>
+                <span className="text-[11px] text-muted-foreground">— the AI team working within your risk limits</span>
               </div>
               <div className="grid gap-2.5 sm:grid-cols-2">
                 {AGENT_OPTIONS.map((a) => {
@@ -386,7 +386,7 @@ function PlanMatter() {
           {/* Footer / CTA */}
           <div className="mt-6 flex items-center justify-between gap-4">
             <span className="text-[12px] text-muted-foreground">
-              {agents.length} agent{agents.length === 1 ? "" : "s"} · {scope.length} clause categories · {redlines.length} red-line{redlines.length === 1 ? "" : "s"}
+              {agents.length} reviewer{agents.length === 1 ? "" : "s"} · {scope.length} clause categories · {redlines.length} red-line{redlines.length === 1 ? "" : "s"}
             </span>
             <div className="flex items-center gap-3">
               {error && <span className="text-[12px] text-[color:var(--color-destructive)]">{error}</span>}
@@ -396,7 +396,7 @@ function PlanMatter() {
                 className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-[13px] font-semibold text-background transition hover:opacity-90 disabled:opacity-60"
               >
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Workstreams className="h-4 w-4" />}
-                Deploy agents &amp; open board
+                Create matter &amp; open board
               </button>
             </div>
           </div>

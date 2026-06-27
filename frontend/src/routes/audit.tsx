@@ -18,7 +18,7 @@ export const Route = createFileRoute("/audit")({
       {
         name: "description",
         content:
-          "Tamper-evident, hash-chained record of every supervised decision across the portfolio.",
+          "Tamper-proof record of every supervised decision across the portfolio.",
       },
     ],
   }),
@@ -84,9 +84,9 @@ function AuditTrail() {
                 Decision record
               </h1>
               <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
-                Every analysis, plan and sign-off across the portfolio, written to an
-                append-only log. Each entry seals the hash of the one before it, so any
-                later edit or deletion is detectable.
+                Every analysis, plan and sign-off across the portfolio, kept as a permanent,
+                add-only record. Each entry is sealed to the one before it, so any later edit
+                or deletion is detectable.
               </p>
             </div>
             {verified !== null && (
@@ -96,10 +96,10 @@ function AuditTrail() {
                   color: verified ? "var(--color-foreground)" : "var(--color-destructive)",
                   backgroundColor: `color-mix(in oklab, ${verified ? "var(--color-foreground)" : "var(--color-destructive)"} 12%, transparent)`,
                 }}
-                title="The server recomputes the SHA-256 hash chain on every read."
+                title="Every entry is sealed to the one before it, so any later edit or deletion is detectable. The record is re-checked each time this page is opened."
               >
                 {verified ? <Seal className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
-                {verified ? "Hash chain verified" : "Chain integrity broken"}
+                {verified ? "Tamper-proof — verified" : "Record integrity broken"}
               </span>
             )}
           </div>
@@ -121,7 +121,7 @@ function AuditTrail() {
 
           {loading ? (
             <div className="flex items-center gap-2 py-12 text-[13px] text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading the chain…
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading the record…
             </div>
           ) : events.length === 0 ? (
             <p className="py-12 text-[13px] text-muted-foreground">
@@ -135,7 +135,7 @@ function AuditTrail() {
                 return (
                   <li
                     key={e.id}
-                    className="rounded-xl border border-white/[0.06] bg-card/50 px-4 py-3"
+                    className="rounded-xl border border-border bg-card/50 px-4 py-3"
                   >
                     <div className="flex items-start gap-3">
                       <span
@@ -190,9 +190,9 @@ function AuditTrail() {
                         </div>
                         <div className="mt-1.5 flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground/70">
                           <Lock className="h-3 w-3" />
-                          <span title={`hash ${e.hash}`}>{e.hash.slice(0, 12)}</span>
+                          <span title={`Seal: ${e.hash}`}>{e.hash.slice(0, 12)}</span>
                           <span className="opacity-50">←</span>
-                          <span title={`prev ${e.prev_hash}`}>{e.prev_hash.slice(0, 12)}</span>
+                          <span title={`Previous seal: ${e.prev_hash}`}>{e.prev_hash.slice(0, 12)}</span>
                         </div>
                       </div>
                     </div>

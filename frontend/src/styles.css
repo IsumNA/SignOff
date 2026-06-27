@@ -78,6 +78,40 @@
   --ring: oklch(0.62 0.17 254);
 }
 
+/* Light theme: document-white with subtly grey chrome, mirroring the dark
+   structure (panels slightly darker than the document). Applied via a
+   `.light` class on <html>; the dark values in :root remain the default. */
+.light {
+  --background: oklch(0.995 0 0);        /* document            ~#fefefe */
+  --foreground: oklch(0.27 0 0);         /* text                ~#2e2e2e */
+  --surface: oklch(0.965 0 0);           /* sidebars / panels   ~#f2f2f2 */
+  --surface-elevated: oklch(0.93 0 0);   /* toolbars / popovers ~#e8e8e8 */
+  --card: oklch(1 0 0);                  /* cards               white    */
+  --card-foreground: oklch(0.27 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.27 0 0);
+  --primary: oklch(0.55 0.18 254);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.93 0 0);
+  --secondary-foreground: oklch(0.27 0 0);
+  --muted: oklch(0.95 0 0);
+  --muted-foreground: oklch(0.50 0 0);   /* dim labels          ~#7f7f7f */
+  --accent: oklch(0.93 0 0);             /* hover / selection bg         */
+  --accent-foreground: oklch(0.2 0 0);
+  --destructive: oklch(0.55 0.21 25);    /* error red                    */
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: oklch(0.52 0.11 170);       /* teal-green                   */
+  --warning: oklch(0.60 0.13 70);        /* amber                        */
+  --info: oklch(0.52 0.13 250);
+  --nvidia: oklch(0.52 0.18 135);
+  --vertex: oklch(0.52 0.14 252);
+  --deal: oklch(0.52 0.14 330);
+  --border: oklch(0.90 0 0);             /* hairline                     */
+  --border-strong: oklch(0.80 0 0);      /* emphasis                     */
+  --input: oklch(0.96 0 0);
+  --ring: oklch(0.55 0.18 254);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);

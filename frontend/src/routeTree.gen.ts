@@ -9,12 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PlanRouteImport } from './routes/plan'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MatterMatterIdRouteImport } from './routes/matter/$matterId'
 import { Route as CoordinateMatterIdRouteImport } from './routes/coordinate/$matterId'
 
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlanRoute = PlanRouteImport.update({
   id: '/plan',
   path: '/plan',
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
   '/plan': typeof PlanRoute
+  '/profile': typeof ProfileRoute
   '/coordinate/$matterId': typeof CoordinateMatterIdRoute
   '/matter/$matterId': typeof MatterMatterIdRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
   '/plan': typeof PlanRoute
+  '/profile': typeof ProfileRoute
   '/coordinate/$matterId': typeof CoordinateMatterIdRoute
   '/matter/$matterId': typeof MatterMatterIdRoute
 }
@@ -60,6 +68,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
   '/plan': typeof PlanRoute
+  '/profile': typeof ProfileRoute
   '/coordinate/$matterId': typeof CoordinateMatterIdRoute
   '/matter/$matterId': typeof MatterMatterIdRoute
 }
@@ -69,15 +78,23 @@ export interface FileRouteTypes {
     | '/'
     | '/audit'
     | '/plan'
+    | '/profile'
     | '/coordinate/$matterId'
     | '/matter/$matterId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/audit' | '/plan' | '/coordinate/$matterId' | '/matter/$matterId'
+  to:
+    | '/'
+    | '/audit'
+    | '/plan'
+    | '/profile'
+    | '/coordinate/$matterId'
+    | '/matter/$matterId'
   id:
     | '__root__'
     | '/'
     | '/audit'
     | '/plan'
+    | '/profile'
     | '/coordinate/$matterId'
     | '/matter/$matterId'
   fileRoutesById: FileRoutesById
@@ -86,12 +103,20 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuditRoute: typeof AuditRoute
   PlanRoute: typeof PlanRoute
+  ProfileRoute: typeof ProfileRoute
   CoordinateMatterIdRoute: typeof CoordinateMatterIdRoute
   MatterMatterIdRoute: typeof MatterMatterIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/plan': {
       id: '/plan'
       path: '/plan'
@@ -134,6 +159,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuditRoute: AuditRoute,
   PlanRoute: PlanRoute,
+  ProfileRoute: ProfileRoute,
   CoordinateMatterIdRoute: CoordinateMatterIdRoute,
   MatterMatterIdRoute: MatterMatterIdRoute,
 }
