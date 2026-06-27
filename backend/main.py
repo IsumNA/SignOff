@@ -39,6 +39,7 @@ from config import (
 )
 import audit
 import events as trace_events
+import insights as portfolio
 from matters import create_matter, get_matter, list_matters, list_tasks
 from mesh import run_mesh
 
@@ -240,6 +241,31 @@ class VerifyResponse(BaseModel):
     broken_at: Optional[int] = None
 
 
+class PlanSuggestion(BaseModel):
+    """Proactive plan recommendation, learned from comparable matters."""
+
+    asset_class: str
+    jurisdiction: str = ""
+    compliance_threshold: int
+    escalation_tier: int
+    reviewers: List[str]
+    scope: List[str]
+    redlines: List[str]
+    hotspots: List[Dict[str, Any]]
+    similar_matters: List[str]
+    based_on: int
+    confidence: float
+    rationale: str
+    avg_compliance: Optional[int] = None
+
+
+class InsightsResponse(BaseModel):
+    generated_at: str
+    learned_from: Dict[str, int]
+    patterns: List[Dict[str, Any]]
+    benchmarks: List[Dict[str, Any]]
+
+
 class AnalyzeClauseRequest(BaseModel):
     clause_text: str = Field(..., min_length=1)
     jurisdiction: str = "EU"
@@ -351,6 +377,8 @@ async def root() -> Dict[str, Any]:
         "endpoints": [
             "/api/health",
             "/api/matters",
+            "/api/insights",
+            "/api/insights/plan",
             "/api/chat",
             "/api/trace/{session_id}/stream",
             "/api/signoff",
@@ -411,6 +439,22 @@ async def new_matter(payload: MatterCreate) -> Matter:
         },
     )
     return Matter(**{k: created[k] for k in Matter.model_fields})
+
+
+@app.get("/api/insights", response_model=InsightsResponse)
+async def get_insights() -> InsightsResponse:
+    """Cross-matter patterns a supervising partner should scrutinise."""
+    return InsightsResponse(**portfolio.portfolio_insights())
+
+
+@app.get("/api/insights/plan", response_model=PlanSuggestion)
+async def suggest_plan(
+    asset_class: str, jurisdiction: str = "", deal_size: str = ""
+) -> PlanSuggestion:
+    """Proactively suggest how to plan a new matter, learned from the portfolio."""
+    return PlanSuggestion(
+        **portfolio.suggest_plan(asset_class, jurisdiction, deal_size)
+    )
 
 
 @app.get("/api/matters/{matter_id}/tasks", response_model=TasksResponse)

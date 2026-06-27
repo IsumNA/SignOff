@@ -252,6 +252,71 @@ export async function getTasks(matterId: string): Promise<TasksResponse> {
   return res.json();
 }
 
+// ---- Portfolio learning: scrutiny insights + proactive plan suggestions ----
+
+export interface RiskHotspot {
+  area: string;
+  tier: number;
+  why: string;
+}
+
+export interface PlanSuggestion {
+  asset_class: string;
+  jurisdiction: string;
+  compliance_threshold: number;
+  escalation_tier: number;
+  reviewers: string[];
+  scope: string[];
+  redlines: string[];
+  hotspots: RiskHotspot[];
+  similar_matters: string[];
+  based_on: number;
+  confidence: number;
+  rationale: string;
+  avg_compliance?: number | null;
+}
+
+export async function getPlanSuggestion(
+  assetClass: string,
+  jurisdiction = "",
+  dealSize = "",
+): Promise<PlanSuggestion> {
+  const qs = new URLSearchParams({ asset_class: assetClass });
+  if (jurisdiction) qs.set("jurisdiction", jurisdiction);
+  if (dealSize) qs.set("deal_size", dealSize);
+  const res = await fetch(`${API_BASE}/api/insights/plan?${qs.toString()}`);
+  if (!res.ok) throw new Error(`plan suggestion ${res.status}`);
+  return res.json();
+}
+
+export type InsightSeverity = "high" | "medium" | "low";
+
+export interface InsightPattern {
+  title: string;
+  detail: string;
+  severity: InsightSeverity;
+  matters: string[];
+}
+
+export interface BenchmarkRow {
+  asset_class: string;
+  avg_compliance: number;
+  matters: number;
+}
+
+export interface PortfolioInsights {
+  generated_at: string;
+  learned_from: { matters: number; decisions: number };
+  patterns: InsightPattern[];
+  benchmarks: BenchmarkRow[];
+}
+
+export async function getInsights(): Promise<PortfolioInsights> {
+  const res = await fetch(`${API_BASE}/api/insights`);
+  if (!res.ok) throw new Error(`insights ${res.status}`);
+  return res.json();
+}
+
 export function newSessionId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }

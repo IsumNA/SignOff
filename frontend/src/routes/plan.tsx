@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
-import { ArrowLeft, Check, ChevronRight, Loader2, Plus, X } from "lucide-react";
-import { createMatter } from "@/lib/api";
+import { useEffect, useState, type ReactNode } from "react";
+import { ArrowLeft, Check, ChevronRight, Lightbulb, Loader2, Plus, X } from "lucide-react";
+import { createMatter, getPlanSuggestion, type PlanSuggestion } from "@/lib/api";
 import { LifecycleStepper } from "@/components/Lifecycle";
 import { Brand } from "@/components/Brand";
 import { Gavel, Scales, Workstreams } from "@/components/icons";
@@ -127,6 +127,41 @@ function PlanMatter() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Proactive, portfolio-learned setup suggestion for this practice area.
+  const [suggestion, setSuggestion] = useState<PlanSuggestion | null>(null);
+  const [applied, setApplied] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    setApplied(false);
+    getPlanSuggestion(assetClass, jurisdiction)
+      .then((s) => {
+        if (live) setSuggestion(s);
+      })
+      .catch(() => {
+        if (live) setSuggestion(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [assetClass, jurisdiction]);
+
+  function applySuggestion() {
+    if (!suggestion) return;
+    setEnvelope(suggestion.compliance_threshold);
+    setEscalationTier(suggestion.escalation_tier);
+    const validAgents = new Set(AGENT_OPTIONS.map((a) => a.name));
+    setAgents(suggestion.reviewers.filter((r) => validAgents.has(r)));
+    const validScope = new Set(SCOPE_OPTIONS);
+    setScope(suggestion.scope.filter((s) => validScope.has(s)));
+    setRedlines((prev) => {
+      const merged = [...prev];
+      for (const r of suggestion.redlines) if (!merged.includes(r)) merged.push(r);
+      return merged;
+    });
+    setApplied(true);
+  }
+
   function toggle(list: string[], setList: (v: string[]) => void, value: string) {
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   }
@@ -201,6 +236,110 @@ function PlanMatter() {
           </div>
 
           <div className="grid gap-5">
+            {/* Proactive, portfolio-learned suggestion */}
+            {suggestion && (
+              <section className="rounded-xl border border-border-strong bg-surface-elevated/40 p-6 animate-reveal">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border-strong text-foreground">
+                      <Lightbulb className="h-3.5 w-3.5" />
+                    </span>
+                    <div className="min-w-0">
+                      <h2 className="font-serif text-[18px] font-medium tracking-[-0.01em]">
+                        Suggested setup for {suggestion.asset_class}
+                      </h2>
+                      <p className="mt-1 max-w-2xl text-[12px] leading-relaxed text-muted-foreground">
+                        {suggestion.rationale}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={applySuggestion}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-foreground px-3 py-1.5 text-[12px] font-semibold text-background transition hover:opacity-90"
+                  >
+                    {applied ? <Check className="h-3.5 w-3.5" /> : <Lightbulb className="h-3.5 w-3.5" />}
+                    {applied ? "Applied" : "Apply suggestion"}
+                  </button>
+                </div>
+
+                {/* Confidence — grows as the portfolio learns from more matters */}
+                <div className="mt-4 max-w-xs">
+                  <div className="flex items-center justify-between text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                    <span>Confidence</span>
+                    <span className="font-mono tabular-nums text-foreground">
+                      {Math.round(suggestion.confidence * 100)}%
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-muted/50">
+                    <div
+                      className="h-full rounded-full bg-foreground transition-all"
+                      style={{ width: `${Math.round(suggestion.confidence * 100)}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-[10.5px] text-muted-foreground">
+                    {suggestion.based_on > 0
+                      ? `Learned from ${suggestion.based_on} comparable matter${suggestion.based_on === 1 ? "" : "s"} — sharpens as you plan more.`
+                      : "Standard playbook — sharpens as you plan matters like this."}
+                  </p>
+                </div>
+
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Recommended limits
+                    </span>
+                    <div className="flex flex-wrap gap-2 text-[12px]">
+                      <span className="rounded-md border border-border bg-surface/60 px-2.5 py-1 text-foreground">
+                        Compliance ≥ <span className="font-mono">{suggestion.compliance_threshold}%</span>
+                      </span>
+                      <span className="rounded-md border border-border bg-surface/60 px-2.5 py-1 text-foreground">
+                        Escalate at Tier {suggestion.escalation_tier}
+                      </span>
+                    </div>
+                    <span className="mt-3 mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Suggested reviewers
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {suggestion.reviewers.map((r) => (
+                        <span key={r} className="rounded-md border border-border bg-surface/60 px-2 py-0.5 text-[11px] text-foreground">
+                          {r}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <Gavel className="h-3.5 w-3.5" /> Likely risk hotspots
+                    </span>
+                    <ul className="space-y-1.5">
+                      {suggestion.hotspots.map((h) => (
+                        <li key={h.area} className="flex items-start gap-2 text-[12px] leading-snug">
+                          <span
+                            className="mt-0.5 shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider"
+                            style={{
+                              color: h.tier >= 3 ? "var(--color-destructive)" : "var(--color-muted-foreground)",
+                              backgroundColor:
+                                h.tier >= 3
+                                  ? "color-mix(in oklab, var(--color-destructive) 14%, transparent)"
+                                  : "var(--color-muted)",
+                            }}
+                          >
+                            T{h.tier}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="font-medium text-foreground">{h.area}</span>
+                            <span className="text-muted-foreground"> — {h.why}</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </section>
+            )}
+
             {/* Scope */}
             <section className="rounded-xl border border-border bg-card/30 p-6">
               <h2 className="mb-5 font-serif text-[18px] font-medium tracking-[-0.01em]">Matter scope</h2>

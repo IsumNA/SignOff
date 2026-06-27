@@ -3,17 +3,21 @@ import { useEffect, useState } from "react";
 import { ArrowUpRight, Cpu, Loader2, Network, Plus } from "lucide-react";
 import {
   getHealth,
+  getInsights,
   getMatters,
   type HealthResponse,
+  type InsightPattern,
   type LedgerSummary,
   type Matter,
   type MatterStage,
   type MatterStatus,
+  type PortfolioInsights,
 } from "@/lib/api";
 import { Brand } from "@/components/Brand";
 import {
   DocumentFold,
   Gavel,
+  ReviewGlass,
   Scales,
   Seal,
   SignatureLine,
@@ -176,6 +180,81 @@ function BlockerPill({ blockers }: { blockers: Matter["blockers"] }) {
   );
 }
 
+const SEVERITY_COLOR: Record<InsightPattern["severity"], string> = {
+  high: "var(--color-destructive)",
+  medium: "var(--color-foreground)",
+  low: "var(--color-muted-foreground)",
+};
+
+function ScrutinyPanel({ insights }: { insights: PortfolioInsights }) {
+  return (
+    <section className="mb-9 rounded-xl border border-border bg-card/30 p-5 animate-reveal">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <ReviewGlass className="h-4 w-4 text-muted-foreground" />
+          <h2 className="font-serif text-[18px] font-medium tracking-[-0.01em]">
+            What to scrutinise
+          </h2>
+        </div>
+        <span className="text-[11px] text-muted-foreground">
+          Learned from {insights.learned_from.matters} matter
+          {insights.learned_from.matters === 1 ? "" : "s"}
+          {insights.learned_from.decisions > 0
+            ? ` · ${insights.learned_from.decisions} recorded decision${insights.learned_from.decisions === 1 ? "" : "s"}`
+            : ""}
+        </span>
+      </div>
+
+      <div className="grid gap-2.5">
+        {insights.patterns.map((p, i) => (
+          <div
+            key={i}
+            className="flex items-start gap-3 rounded-lg border border-border bg-surface/40 px-3.5 py-3"
+          >
+            <span
+              className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full"
+              style={{ background: SEVERITY_COLOR[p.severity] }}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-medium text-foreground">{p.title}</p>
+              <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{p.detail}</p>
+              {p.matters.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {p.matters.map((m) => (
+                    <span
+                      key={m}
+                      className="rounded border border-border bg-card px-1.5 py-0.5 text-[10.5px] text-muted-foreground"
+                    >
+                      {m}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {insights.benchmarks.length > 0 && (
+        <div className="mt-4 border-t border-border pt-3">
+          <span className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+            Typical compliance by practice area
+          </span>
+          <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+            {insights.benchmarks.map((b) => (
+              <span key={b.asset_class} className="text-[12px] text-muted-foreground">
+                {b.asset_class}{" "}
+                <span className="font-mono tabular-nums text-foreground">{b.avg_compliance}%</span>
+                <span className="opacity-60"> · {b.matters}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -185,6 +264,7 @@ function Ledger() {
   const [matters, setMatters] = useState<Matter[] | null>(null);
   const [summary, setSummary] = useState<LedgerSummary | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [insights, setInsights] = useState<PortfolioInsights | null>(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
@@ -195,6 +275,7 @@ function Ledger() {
         setSummary(r.summary);
       })
       .catch(() => setError(true));
+    getInsights().then(setInsights).catch(() => setInsights(null));
   }, []);
 
   const meshLive = health
@@ -304,6 +385,11 @@ function Ledger() {
               value={summary ? String(summary.ready_to_sign) : "—"}
             />
           </div>
+
+          {/* What to scrutinise — cross-matter patterns the supervisor should look at */}
+          {insights && insights.patterns.length > 0 && (
+            <ScrutinyPanel insights={insights} />
+          )}
 
           {/* Ledger table */}
           <div className="overflow-hidden rounded-xl border border-border bg-card/30">
